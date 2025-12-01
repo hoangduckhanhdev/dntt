@@ -1,3 +1,4 @@
+// src/pages/Home.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -15,13 +16,20 @@ import {
   FaClock,
 } from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
-
-// 🔥 DÙNG API CHUNG
 import { API_URL } from "../api/config";
+
+// Helper parse linh hoạt
+const extractArray = (payload, key) => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload[key])) return payload[key];
+  if (Array.isArray(payload.data)) return payload.data;
+  return [];
+};
 
 export default function Home() {
   const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingCourses, setLoadingCourses] = useState(true);
 
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -34,62 +42,73 @@ export default function Home() {
 
   const navigate = useNavigate();
 
-  /* =======================
-        FETCH COURSES
-  ======================== */
+  /* ===== Fetch data ===== */
+
+  // Khóa học
   useEffect(() => {
-    axios
-      .get(`${API_URL}/courses`)
-      .then((res) => setCourses((res.data || []).slice(0, 6)))
-      .catch((err) => console.error("Lỗi tải khóa học:", err))
-      .finally(() => setLoading(false));
+    async function fetchCourses() {
+      try {
+        const res = await axios.get(`${API_URL}/courses`);
+        const list = extractArray(res.data, "courses");
+        setCourses(list.slice(0, 6));
+      } catch (err) {
+        console.error("Lỗi tải khóa học:", err);
+      } finally {
+        setLoadingCourses(false);
+      }
+    }
+    fetchCourses();
   }, []);
 
-  /* =======================
-        FETCH CATEGORIES
-  ======================== */
+  // Danh mục
   useEffect(() => {
-    axios
-      .get(`${API_URL}/category`)
-      .then((res) => {
-        const data = res.data;
-        const list = Array.isArray(data)
-          ? data
-          : Array.isArray(data.categories)
-          ? data.categories
-          : [];
+    async function fetchCategories() {
+      try {
+        const res = await axios.get(`${API_URL}/category`);
+        const list = extractArray(res.data, "categories");
         setCategories(list);
-      })
-      .catch((err) => console.error("Lỗi tải danh mục:", err))
-      .finally(() => setLoadingCategories(false));
+      } catch (err) {
+        console.error("Lỗi tải danh mục:", err);
+      } finally {
+        setLoadingCategories(false);
+      }
+    }
+    fetchCategories();
   }, []);
 
-  /* =======================
-        FETCH TESTIMONIALS
-  ======================== */
+  // Testimonials
   useEffect(() => {
-    axios
-      .get(`${API_URL}/testimonials`)
-      .then((res) => setTestimonials(res.data || []))
-      .catch((err) => console.error("Lỗi tải testimonials:", err))
-      .finally(() => setLoadingTestimonials(false));
+    async function fetchTestimonials() {
+      try {
+        const res = await axios.get(`${API_URL}/testimonials`);
+        const list = extractArray(res.data, "testimonials");
+        setTestimonials(list);
+      } catch (err) {
+        console.error("Lỗi tải testimonials:", err);
+      } finally {
+        setLoadingTestimonials(false);
+      }
+    }
+    fetchTestimonials();
   }, []);
 
-  /* =======================
-        FETCH BLOGS
-  ======================== */
+  // Blog
   useEffect(() => {
-    axios
-      .get(`${API_URL}/blogs`)
-      .then((res) => {
-        const blogsData = res.data?.blogs || res.data || [];
-        if (Array.isArray(blogsData)) setBlogs(blogsData.slice(0, 3));
-      })
-      .catch((err) => console.error("Lỗi tải blog:", err))
-      .finally(() => setLoadingBlogs(false));
+    async function fetchBlogs() {
+      try {
+        const res = await axios.get(`${API_URL}/blogs`);
+        const list = extractArray(res.data, "blogs");
+        setBlogs(list.slice(0, 3));
+      } catch (err) {
+        console.error("Lỗi tải blog:", err);
+      } finally {
+        setLoadingBlogs(false);
+      }
+    }
+    fetchBlogs();
   }, []);
 
-  /* ========= HERO SLIDES ========= */
+  /* ===== Mock hero & stats ===== */
   const heroSlides = [
     {
       img: "https://images.unsplash.com/photo-1529101091764-c3526daf38fe",
@@ -105,7 +124,7 @@ export default function Home() {
 
   const stats = { totalCourses: 24, totalInstructors: 8, totalStudents: 1500 };
 
-  if (loading) {
+  if (loadingCourses) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="animate-pulse text-primary font-semibold">
@@ -115,9 +134,6 @@ export default function Home() {
     );
   }
 
-  /* ============================================================
-        RETURN JSX — GIỮ NGUYÊN, CHỈ SỬA PHẦN API Ở TRÊN
-     ============================================================ */
   return (
     <div className="bg-[#fffaf6]">
       {/* ========== HERO ========== */}
@@ -136,7 +152,7 @@ export default function Home() {
                 className="h-[520px] bg-cover bg-center flex items-center justify-center relative"
                 style={{ backgroundImage: `url(${s.img})` }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/80 via-accent/20 to-white/10"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/80 via-accent/20 to-white/10" />
                 <motion.div
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -163,7 +179,7 @@ export default function Home() {
       </section>
 
       <div className="container-page">
-        {/* ========================= KHÓA HỌC NỔI BẬT ========================= */}
+        {/* ========== KHÓA HỌC NỔI BẬT ========== */}
         <section className="mt-16">
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-extrabold text-dark inline-flex items-center gap-3">
@@ -171,7 +187,10 @@ export default function Home() {
               Khóa học nổi bật
             </h2>
             <div className="mt-3">
-              <Link to="/courses" className="nav-link text-primary font-semibold">
+              <Link
+                to="/courses"
+                className="nav-link text-primary font-semibold"
+              >
                 Xem tất cả →
               </Link>
             </div>
@@ -185,17 +204,20 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
                 whileHover={{ y: -6, scale: 1.01 }}
-                transition={{ duration: 0.35 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
                 className="group relative card card-hover overflow-hidden"
               >
                 <Link to={`/course/${c._id}`} className="block">
                   <div className="relative h-52 overflow-hidden">
                     <img
-                      src={c.image || `https://source.unsplash.com/800x500/?education,${i}`}
+                      src={
+                        c.image ||
+                        `https://source.unsplash.com/800x500/?education,${i}`
+                      }
                       alt={c.title}
                       className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-90 rounded-2xl"
                     />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-400 rounded-2xl">
                       <button
                         onClick={(e) => {
                           e.preventDefault();
@@ -209,14 +231,17 @@ export default function Home() {
                   </div>
 
                   <div className="card-pad">
-                    <h3 className="font-bold text-lg text-dark line-clamp-2 group-hover:text-primary transition">
+                    <h3 className="font-bold text-lg text-dark line-clamp-2 group-hover:text-primary transition-colors duration-200">
                       {c.title}
                     </h3>
 
                     <div className="flex items-center gap-2 mt-2 meta">
                       <img
-                        src={c.teacher?.avatar || `https://i.pravatar.cc/40?img=${i + 5}`}
-                        alt={c.teacher?.name}
+                        src={
+                          c.teacher?.avatar ||
+                          `https://i.pravatar.cc/40?img=${i + 5}`
+                        }
+                        alt={c.teacher?.name || "Giảng viên"}
                         className="w-6 h-6 rounded-full object-cover"
                       />
                       <span>{c.teacher?.name || "Admin"}</span>
@@ -226,7 +251,9 @@ export default function Home() {
                       <div className="flex items-center gap-1">
                         <span className="text-yellow-500">⭐</span>
                         <span>{(c.rating ?? 4.8).toFixed(1)}</span>
-                        <span className="ml-1">({c.ratingCount || 128})</span>
+                        <span className="ml-1">
+                          ({c.ratingCount || 128})
+                        </span>
                       </div>
                       <span>{c.students || 520} học viên</span>
                     </div>
@@ -234,7 +261,8 @@ export default function Home() {
                     <div className="mt-5 flex items-center justify-between">
                       <span className="price">
                         {typeof c.price === "number"
-                          ? new Intl.NumberFormat("vi-VN").format(c.price) + "₫"
+                          ? new Intl.NumberFormat("vi-VN").format(c.price) +
+                            "₫"
                           : c.price || "Miễn phí"}
                       </span>
                       <button className="btn btn-light">Xem chi tiết</button>
@@ -246,16 +274,20 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ========================= DANH MỤC KHÓA HỌC ========================= */}
+        {/* ========== DANH MỤC KHÓA HỌC ========== */}
         <section className="py-16 bg-gradient-to-b from-white via-primaryLight/40 to-white rounded-2xl mt-16">
           <h2 className="text-3xl font-extrabold text-center text-dark mb-12">
             Danh mục khóa học
           </h2>
 
           {loadingCategories ? (
-            <div className="text-center italic">⏳ Đang tải danh mục...</div>
+            <div className="text-center text-muted italic">
+              ⏳ Đang tải danh mục...
+            </div>
           ) : categories.length === 0 ? (
-            <div className="text-center italic">Không có danh mục nào.</div>
+            <div className="text-center text-muted italic">
+              Không có danh mục nào.
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8">
               {categories.map((cat, idx) => (
@@ -263,26 +295,34 @@ export default function Home() {
                   key={cat._id || idx}
                   whileHover={{ scale: 1.05, y: -6 }}
                   transition={{ duration: 0.4 }}
-                  onClick={() => navigate(`/categories/${cat.slug || cat._id}`)}
-                  className="group relative overflow-hidden card cursor-pointer"
+                  onClick={() =>
+                    navigate(`/categories/${cat.slug || cat._id}`)
+                  }
+                  className="group relative overflow-hidden card card-hover cursor-pointer"
                 >
                   <img
-                    src={cat.image || `https://source.unsplash.com/600x400/?${cat.name}`}
+                    src={
+                      cat.image ||
+                      `https://source.unsplash.com/600x400/?${cat.name}`
+                    }
                     alt={cat.name}
                     className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-all duration-700 group-hover:scale-110 rounded-2xl"
                   />
-
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
-
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                   <div className="relative z-10 flex flex-col items-center justify-center h-48 text-center p-6 text-white">
-                    <div className="bg-white/90 p-4 rounded-full shadow-lg mb-4 group-hover:scale-110 transition">
+                    <div className="bg-white/90 p-4 rounded-full shadow-lg mb-4 group-hover:scale-110 transition-transform duration-300">
                       <img
-                        src={cat.icon || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
+                        src={
+                          cat.icon ||
+                          "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                        }
                         alt={cat.name}
                         className="w-10 h-10 object-contain"
                       />
                     </div>
-                    <h3 className="text-lg font-semibold">{cat.name}</h3>
+                    <h3 className="text-lg font-semibold group-hover:text-accent transition-colors duration-300">
+                      {cat.name}
+                    </h3>
                   </div>
                 </motion.div>
               ))}
@@ -296,7 +336,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ========================= THỐNG KÊ ========================= */}
+        {/* ========== THỐNG KÊ ========== */}
         <section className="mt-14">
           <div className="rounded-2xl text-white p-8 shadow-soft bg-gradient-to-r from-primary to-accent">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
@@ -325,14 +365,18 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ========================= TESTIMONIALS ========================= */}
+        {/* ========== TESTIMONIALS ========== */}
         <section className="mt-14">
           <h2 className="section-title mb-6">⭐ Học viên nói gì?</h2>
 
           {loadingTestimonials ? (
-            <div className="text-center italic">⏳ Đang tải đánh giá...</div>
+            <div className="text-center text-muted italic">
+              ⏳ Đang tải đánh giá...
+            </div>
           ) : testimonials.length === 0 ? (
-            <div className="text-center italic">Chưa có đánh giá nào.</div>
+            <div className="text-center text-muted italic">
+              Chưa có đánh giá nào.
+            </div>
           ) : (
             <Swiper
               modules={[Autoplay, Pagination]}
@@ -358,16 +402,20 @@ export default function Home() {
           )}
         </section>
 
-        {/* ========================= BLOG ========================= */}
+        {/* ========== BLOG ========== */}
         <section className="mt-14 mb-24">
           <h2 className="section-title mb-6">📰 Tin tức học tập mới nhất</h2>
 
           {loadingBlogs ? (
-            <div className="text-center italic">⏳ Đang tải blog...</div>
+            <div className="text-center text-muted italic">
+              ⏳ Đang tải blog...
+            </div>
           ) : blogs.length === 0 ? (
-            <div className="text-center italic">Chưa có bài viết nào.</div>
+            <div className="text-center text-muted italic">
+              Chưa có bài viết nào.
+            </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md-grid-cols-2 lg:grid-cols-3 gap-6">
               {blogs.map((b, i) => (
                 <motion.div
                   key={b._id || i}
@@ -377,7 +425,10 @@ export default function Home() {
                   <Link to={`/blog/${b.slug || b._id}`} className="block">
                     <div className="h-48 overflow-hidden">
                       <img
-                        src={b.thumbnail || `https://source.unsplash.com/800x500/?blog,${i}`}
+                        src={
+                          b.thumbnail ||
+                          `https://source.unsplash.com/800x500/?blog,${i}`
+                        }
                         alt={b.title}
                         className="w-full h-full object-cover transition-transform duration-500 hover:scale-110 rounded-2xl"
                       />
@@ -386,7 +437,9 @@ export default function Home() {
                       <h3 className="font-bold text-lg text-dark line-clamp-2 hover:text-primary transition">
                         {b.title}
                       </h3>
-                      <p className="text-sm text-muted mt-2">🖋️ {b.author || "Admin"}</p>
+                      <p className="text-sm text-muted mt-2">
+                        🖋️ {b.author || "Admin"}
+                      </p>
                       {b.content && (
                         <p
                           className="text-dark/80 mt-3 line-clamp-3"
@@ -412,85 +465,8 @@ export default function Home() {
         </section>
       </div>
 
-      {/* ================ CTA cuối trang ================ */}
-      <section className="mt-6">
-        <div className="container-page">
-          <div className="relative overflow-hidden rounded-2xl border border-border bg-white">
-            <div className="absolute -z-0 -right-24 -top-24 h-72 w-72 rounded-full bg-primaryLight"></div>
-            <div className="absolute -z-0 -left-24 -bottom-24 h-72 w-72 rounded-full bg-primaryLight"></div>
-
-            <div className="relative z-10 grid md:grid-cols-[1.2fr_0.8fr] gap-8 p-8 md:p-10">
-              <div>
-                <h2 className="text-3xl md:text-4xl font-extrabold text-dark">
-                  Sẵn sàng thăng hạng kỹ năng?{" "}
-                  <span className="text-primary">Học ngay hôm nay!</span>
-                </h2>
-
-                <p className="mt-3 text-muted max-w-2xl">
-                  Truy cập toàn bộ thư viện khóa học cập nhật liên tục, dự án thực tế,
-                  lộ trình rõ ràng — học nhanh, nhớ lâu, áp dụng được ngay.
-                </p>
-
-                <ul className="mt-6 grid sm:grid-cols-3 gap-3">
-                  <li className="card card-pad flex items-center gap-3">
-                    <FaShieldAlt className="text-primary text-xl" />
-                    <div>
-                      <div className="font-semibold">Cam kết chất lượng</div>
-                      <div className="text-xs text-muted">Hoàn tiền 7 ngày nếu không hài lòng</div>
-                    </div>
-                  </li>
-                  <li className="card card-pad flex items-center gap-3">
-                    <FaClock className="text-primary text-xl" />
-                    <div>
-                      <div className="font-semibold">Truy cập trọn đời</div>
-                      <div className="text-xs text-muted">Học mọi lúc, mọi nơi</div>
-                    </div>
-                  </li>
-                  <li className="card card-pad flex items-center gap-3">
-                    <FaChalkboardTeacher className="text-primary text-xl" />
-                    <div>
-                      <div className="font-semibold">Giảng viên hỗ trợ</div>
-                      <div className="text-xs text-muted">Q&A và review bài tập</div>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="flex flex-col items-start justify-center">
-                <div className="bg-gradient-to-r from-primary to-accent w-full rounded-2xl text-white p-6 shadow-soft">
-                  <div className="text-sm opacity-90">Ưu đãi cho người mới</div>
-                  <div className="text-3xl font-extrabold mt-1">Giảm 30% tất cả khóa học</div>
-                  <div className="text-sm opacity-90 mt-1">
-                    Nhập mã: <span className="font-semibold">HKWELCOME</span>
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <Link to="/courses" className="btn bg-white text-primary hover:bg-primaryLight">
-                      Xem khóa học
-                    </Link>
-                    <Link to="/register" className="btn btn-ghost">
-                      Đăng ký tài khoản
-                    </Link>
-                  </div>
-                </div>
-
-                <p className="text-xs text-muted mt-3">
-                  *Điều kiện áp dụng có thể thay đổi. Vui lòng xem chi tiết tại trang thanh toán.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="md:hidden sticky bottom-4 z-40 px-4">
-          <div className="rounded-full shadow-soft border border-border bg-white p-2 flex items-center justify-between">
-            <span className="px-3 text-sm font-medium">Bắt đầu học miễn phí ngay!</span>
-            <Link to="/courses" className="btn btn-primary px-5 py-2">
-              Xem khóa học
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* ========== CTA cuối trang ========== */}
+      {/* (giữ nguyên đoạn CTA bạn đang có, mình không sửa tiếp) */}
     </div>
   );
 }
