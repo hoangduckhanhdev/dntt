@@ -1,0 +1,66 @@
+const Category = require("../models/Category");
+
+// 📌 Lấy tất cả danh mục
+exports.getCategories = async (req, res) => {
+  try {
+    const categories = await Category.find();
+    res.json(categories);
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi khi lấy danh mục", error: err.message });
+  }
+};
+
+// 📌 Lấy danh mục theo ID hoặc slug
+exports.getCategoryByIdOrSlug = async (req, res) => {
+  try {
+    const { idOrSlug } = req.params;
+    let category;
+
+    // Nếu là ObjectId hợp lệ → tìm theo ID, ngược lại tìm theo slug
+    if (idOrSlug.match(/^[0-9a-fA-F]{24}$/)) {
+      category = await Category.findById(idOrSlug);
+    } else {
+      category = await Category.findOne({ slug: idOrSlug });
+    }
+
+    if (!category)
+      return res.status(404).json({ message: "Không tìm thấy danh mục" });
+
+    res.json(category);
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi khi lấy danh mục", error: err.message });
+  }
+};
+
+// 📌 Tạo danh mục mới
+exports.createCategory = async (req, res) => {
+  try {
+    const category = new Category(req.body);
+    await category.save();
+    res.status(201).json(category);
+  } catch (err) {
+    res.status(400).json({ message: "Lỗi khi tạo danh mục", error: err.message });
+  }
+};
+
+// 📌 Cập nhật danh mục theo ID
+exports.updateCategory = async (req, res) => {
+  try {
+    const updated = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ message: "Không tìm thấy danh mục" });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ message: "Lỗi khi cập nhật danh mục", error: err.message });
+  }
+};
+
+// 📌 Xóa danh mục theo ID
+exports.deleteCategory = async (req, res) => {
+  try {
+    const deleted = await Category.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Không tìm thấy danh mục" });
+    res.json({ message: "Đã xóa danh mục thành công" });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi khi xóa danh mục", error: err.message });
+  }
+};

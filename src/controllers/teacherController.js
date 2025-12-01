@@ -1,0 +1,57 @@
+const Teacher = require("../models/Teacher");
+const Course = require("../models/Course");
+
+// 🟢 Lấy danh sách giảng viên
+exports.getTeachers = async (req, res) => {
+  try {
+    const teachers = await Teacher.find();
+    res.json(teachers);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// 🟢 Lấy chi tiết giảng viên + các khóa học họ dạy
+exports.getTeacherById = async (req, res) => {
+  try {
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) {
+      return res.status(404).json({ message: "Không tìm thấy giảng viên." });
+    }
+    res.json(teacher);
+  } catch (err) {
+    console.error("Lỗi lấy chi tiết giảng viên:", err);
+    res.status(500).json({ message: "Lỗi server." });
+  }
+};
+
+// 🟢 Tạo mới giảng viên
+exports.createTeacher = async (req, res) => {
+  try {
+    const newTeacher = new Teacher(req.body);
+    await newTeacher.save();
+    res.status(201).json(newTeacher);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+// 🟡 Cập nhật giảng viên
+exports.updateTeacher = async (req, res) => {
+  try {
+    const updated = await Teacher.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+// 🔴 Xóa giảng viên
+exports.deleteTeacher = async (req, res) => {
+  try {
+    await Teacher.findByIdAndDelete(req.params.id);
+    res.json({ message: "Đã xóa giảng viên" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

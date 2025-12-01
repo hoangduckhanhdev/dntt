@@ -1,0 +1,53 @@
+const mongoose = require("mongoose");
+
+const homeSchema = new mongoose.Schema(
+  {
+    heroSlides: [
+      {
+        img: { type: String, required: true },
+        title: { type: String, required: true },
+        subtitle: { type: String, required: true },
+      },
+    ],
+    courses: [
+      {
+        title: String,
+        instructor: String,
+        img: String,
+        price: Number,
+      },
+    ],
+    categories: [
+      {
+        name: String,
+        icon: String,
+      },
+    ],
+    instructors: [
+      {
+        name: String,
+        expertise: String,
+        img: String,
+        rating: Number,
+      },
+    ],
+    blogs: [
+      {
+        title: String,
+        description: String,
+        img: String,
+        date: String,
+      },
+    ],
+    testimonials: [
+      {
+        name: String,
+        comment: String,
+        img: String,
+      },
+    ],
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("Home", homeSchema);

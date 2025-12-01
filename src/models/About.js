@@ -1,0 +1,22 @@
+const mongoose = require("mongoose");
+
+const aboutSchema = new mongoose.Schema({
+  title: String,
+  content: String,
+  mission: String,
+  vision: String,
+  values: String,
+  features: Array,
+  gallery: [String],
+  image: String,
+  video: String,
+  explore: {
+    title: String,
+    subtitle: String,
+    buttonText: String,
+    buttonLink: String,
+    background: String
+  }
+});
+
+module.exports = mongoose.model("About", aboutSchema);

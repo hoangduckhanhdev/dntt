@@ -1,0 +1,18 @@
+// src/utils/authConfig.js
+export const getAuthConfig = () => {
+  try {
+    const token = localStorage.getItem("token");
+    const headers = {};
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return {
+      headers,
+      withCredentials: true,
+    };
+  } catch {
+    return { withCredentials: true };
+  }
+};

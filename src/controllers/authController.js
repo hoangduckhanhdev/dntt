@@ -1,0 +1,136 @@
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const sendEmail = require("../utils/sendEmail");
+const crypto = require("crypto");
+
+const generateToken = (user) => {
+  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+};
+
+// Đăng ký
+const register = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    const existing = await User.findOne({ email });
+    if (existing)
+      return res.status(400).json({ message: "Email đã tồn tại" });
+
+    const user = await User.create({ name, email, password, role });
+    const token = generateToken(user);
+
+    res.status(201).json({
+      success: true,
+      message: "Đăng ký thành công",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Lỗi đăng ký:", err);
+    res.status(500).json({ success: false, message: "Lỗi server khi đăng ký" });
+  }
+};
+
+// Đăng nhập
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(400).json({ message: "Không tìm thấy tài khoản" });
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch)
+      return res.status(400).json({ message: "Sai mật khẩu" });
+
+    const token = generateToken(user);
+
+    res.status(200).json({
+      success: true,
+      message: "Đăng nhập thành công",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Lỗi đăng nhập:", err);
+    res.status(500).json({ success: false, message: "Lỗi server khi đăng nhập" });
+  }
+};
+// 🟠 Quên mật khẩu
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(404).json({ message: "Không tìm thấy tài khoản với email này" });
+
+    // ✅ Tạo token reset mật khẩu
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 phút
+    await user.save({ validateBeforeSave: false });
+
+    // ✅ Gửi email
+    const resetURL = `http://localhost:5173/reset-password/${resetToken}`;
+    const message = `
+      <h2>Yêu cầu đặt lại mật khẩu</h2>
+      <p>Vui lòng nhấn vào link bên dưới để đặt lại mật khẩu của bạn (hết hạn sau 15 phút):</p>
+      <a href="${resetURL}" target="_blank">${resetURL}</a>
+    `;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Đặt lại mật khẩu - HKCode",
+      html: message,
+    });
+
+    res.json({ success: true, message: "Email đặt lại mật khẩu đã được gửi!" });
+  } catch (error) {
+    console.error("❌ Lỗi forgotPassword:", error);
+    res.status(500).json({ success: false, message: "Lỗi server" });
+  }
+};
+
+// 🟢 Đặt lại mật khẩu
+const resetPassword = async (req, res) => {
+  try {
+    const resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(req.params.token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user)
+      return res.status(400).json({ message: "Token không hợp lệ hoặc đã hết hạn" });
+
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ success: true, message: "Đặt lại mật khẩu thành công!" });
+  } catch (error) {
+    console.error("❌ Lỗi resetPassword:", error);
+    res.status(500).json({ success: false, message: "Lỗi server" });
+  }
+};
+module.exports = { register, login, forgotPassword, resetPassword };

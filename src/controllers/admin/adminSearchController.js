@@ -1,0 +1,21 @@
+const User = require("../../models/User");
+const Course = require("../../models/Course");
+const Blog = require("../../models/Blog");
+const Category = require("../../models/Category");
+
+exports.globalSearch = async (req, res) => {
+  try {
+    const query = req.query.q || "";
+
+    const [users, courses, blogs, categories] = await Promise.all([
+      User.find({ name: { $regex: query, $options: "i" } }).limit(5),
+      Course.find({ title: { $regex: query, $options: "i" } }).limit(5),
+      Blog.find({ title: { $regex: query, $options: "i" } }).limit(5),
+      Category.find({ name: { $regex: query, $options: "i" } }).limit(5),
+    ]);
+
+    res.status(200).json({ users, courses, blogs, categories });
+  } catch (error) {
+    res.status(500).json({ message: "Error performing search", error });
+  }
+};

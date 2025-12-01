@@ -1,0 +1,36 @@
+
+const express = require("express");
+const {
+  getUsers,
+  getUser,
+  createUser,
+  updateUser,
+  deleteUser,
+  updateUserRole,
+  updateUserAvatar,
+  updateUserPassword, 
+} = require("../../controllers/admin/adminUserController");
+
+const { protect, admin } = require("../../middlewares/authMiddleware");
+const upload = require("../../middlewares/upload");
+
+const router = express.Router();
+
+router.get("/", protect, admin, getUsers);
+router.get("/:id", protect, admin, getUser);
+router.post("/", protect, admin, upload.single("avatar"), createUser);
+router.put("/:id", protect, admin, upload.single("avatar"), updateUser);
+router.delete("/:id", protect, admin, deleteUser);
+
+router.put("/:id/password", protect, admin, updateUserPassword);
+
+router.put("/:id/role", protect, admin, updateUserRole);
+router.put(
+  "/:id/avatar",
+  protect,
+  admin,
+  upload.single("avatar"),
+  updateUserAvatar
+);
+
+module.exports = router;

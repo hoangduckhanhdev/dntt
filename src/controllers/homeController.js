@@ -1,0 +1,43 @@
+const Home = require("../models/Home");
+
+exports.getHome = async (req, res) => {
+  try {
+    const home = await Home.findOne();
+    if (!home)
+      return res.status(404).json({ message: "Không có dữ liệu trang chủ" });
+    res.json(home);
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi server", error: err.message });
+  }
+};
+
+exports.createHome = async (req, res) => {
+  try {
+    const newHome = new Home(req.body);
+    await newHome.save();
+    res.status(201).json(newHome);
+  } catch (err) {
+    res.status(400).json({ message: "Tạo mới thất bại", error: err.message });
+  }
+};
+
+exports.updateHome = async (req, res) => {
+  try {
+    const home = await Home.findOneAndUpdate({}, req.body, {
+      new: true,
+      upsert: true,
+    });
+    res.json(home);
+  } catch (err) {
+    res.status(500).json({ message: "Cập nhật thất bại", error: err.message });
+  }
+};
+
+exports.deleteHome = async (req, res) => {
+  try {
+    await Home.deleteMany({});
+    res.json({ message: "Xóa thành công" });
+  } catch (err) {
+    res.status(500).json({ message: "Xóa thất bại", error: err.message });
+  }
+};

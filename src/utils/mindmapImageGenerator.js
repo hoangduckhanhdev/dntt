@@ -1,0 +1,35 @@
+const OpenAI = require("openai");
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+/**
+ * Generate Mindmap Image From JSON Tree
+ * @param {Object} mindmapJson
+ * @returns {String} base64 PNG
+ */
+exports.generateMindmapImage = async (mindmapJson) => {
+  try {
+    const prompt = `
+Bạn là công cụ tạo sơ đồ tư duy.
+Hãy chuyển JSON dưới đây thành một sơ đồ tư duy dạng PNG.
+Yêu cầu:
+- Kiểu mindmap hiện đại
+- Khung bo tròn
+- Màu sắc pastel
+- Dễ nhìn, các nhánh rõ ràng
+
+JSON:
+${JSON.stringify(mindmapJson, null, 2)}
+    `;
+
+    const img = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt,
+      size: "1024x1024"
+    });
+
+    return img.data[0].b64_json; // base64
+  } catch (err) {
+    console.error("Error generating mindmap image:", err);
+    return null;
+  }
+};

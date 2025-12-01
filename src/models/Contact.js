@@ -1,0 +1,22 @@
+const mongoose = require("mongoose");
+
+const contactSchema = new mongoose.Schema({
+  title: String,
+  description: String,
+  email: String,
+  phone: String,
+  address: String,
+  facebook: String,
+  zalo: String,
+  socials: [
+    {
+      name: String,
+      icon: String,
+      url: String
+    }
+  ],
+  mapEmbed: String,
+  background: String
+});
+
+module.exports = mongoose.model("Contact", contactSchema);
