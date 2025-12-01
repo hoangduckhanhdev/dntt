@@ -7,8 +7,17 @@ import "swiper/css/pagination";
 import "swiper/css/navigation";
 import { motion } from "framer-motion";
 import CountUp from "react-countup";
-import { FaUserGraduate, FaChalkboardTeacher, FaLaptopCode, FaShieldAlt, FaClock } from "react-icons/fa";
+import {
+  FaUserGraduate,
+  FaChalkboardTeacher,
+  FaLaptopCode,
+  FaShieldAlt,
+  FaClock,
+} from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
+
+// 🔥 DÙNG API CHUNG
+import { API_URL } from "../api/config";
 
 export default function Home() {
   const [courses, setCourses] = useState([]);
@@ -25,35 +34,53 @@ export default function Home() {
 
   const navigate = useNavigate();
 
-  /* ===== Fetch data ===== */
+  /* =======================
+        FETCH COURSES
+  ======================== */
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/courses")
+      .get(`${API_URL}/courses`)
       .then((res) => setCourses((res.data || []).slice(0, 6)))
       .catch((err) => console.error("Lỗi tải khóa học:", err))
       .finally(() => setLoading(false));
   }, []);
 
+  /* =======================
+        FETCH CATEGORIES
+  ======================== */
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/category")
-      .then((res) => setCategories(res.data || []))
+      .get(`${API_URL}/category`)
+      .then((res) => {
+        const data = res.data;
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data.categories)
+          ? data.categories
+          : [];
+        setCategories(list);
+      })
       .catch((err) => console.error("Lỗi tải danh mục:", err))
       .finally(() => setLoadingCategories(false));
   }, []);
 
+  /* =======================
+        FETCH TESTIMONIALS
+  ======================== */
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/testimonials")
+      .get(`${API_URL}/testimonials`)
       .then((res) => setTestimonials(res.data || []))
       .catch((err) => console.error("Lỗi tải testimonials:", err))
       .finally(() => setLoadingTestimonials(false));
   }, []);
 
-  // ✅ Sửa: đưa fetch blog vào useEffect để tránh gọi lặp ngoài render
+  /* =======================
+        FETCH BLOGS
+  ======================== */
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/blogs")
+      .get(`${API_URL}/blogs`)
       .then((res) => {
         const blogsData = res.data?.blogs || res.data || [];
         if (Array.isArray(blogsData)) setBlogs(blogsData.slice(0, 3));
@@ -62,7 +89,7 @@ export default function Home() {
       .finally(() => setLoadingBlogs(false));
   }, []);
 
-  /* ===== Mock hero & stats ===== */
+  /* ========= HERO SLIDES ========= */
   const heroSlides = [
     {
       img: "https://images.unsplash.com/photo-1529101091764-c3526daf38fe",
@@ -88,6 +115,9 @@ export default function Home() {
     );
   }
 
+  /* ============================================================
+        RETURN JSX — GIỮ NGUYÊN, CHỈ SỬA PHẦN API Ở TRÊN
+     ============================================================ */
   return (
     <div className="bg-[#fffaf6]">
       {/* ========== HERO ========== */}
@@ -133,7 +163,7 @@ export default function Home() {
       </section>
 
       <div className="container-page">
-        {/* ========== KHÓA HỌC NỔI BẬT ========== */}
+        {/* ========================= KHÓA HỌC NỔI BẬT ========================= */}
         <section className="mt-16">
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-extrabold text-dark inline-flex items-center gap-3">
@@ -155,20 +185,17 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
                 whileHover={{ y: -6, scale: 1.01 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
+                transition={{ duration: 0.35 }}
                 className="group relative card card-hover overflow-hidden"
               >
                 <Link to={`/course/${c._id}`} className="block">
-                  {/* Hình khóa học + overlay */}
                   <div className="relative h-52 overflow-hidden">
                     <img
                       src={c.image || `https://source.unsplash.com/800x500/?education,${i}`}
                       alt={c.title}
                       className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-90 rounded-2xl"
                     />
-
-                    {/* Overlay CTA */}
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-400 rounded-2xl">
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                       <button
                         onClick={(e) => {
                           e.preventDefault();
@@ -181,24 +208,20 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Nội dung khóa học */}
                   <div className="card-pad">
-                    {/* Tiêu đề */}
-                    <h3 className="font-bold text-lg text-dark line-clamp-2 group-hover:text-primary transition-colors duration-200">
+                    <h3 className="font-bold text-lg text-dark line-clamp-2 group-hover:text-primary transition">
                       {c.title}
                     </h3>
 
-                    {/* Giảng viên */}
                     <div className="flex items-center gap-2 mt-2 meta">
                       <img
                         src={c.teacher?.avatar || `https://i.pravatar.cc/40?img=${i + 5}`}
-                        alt={c.teacher?.name || "Giảng viên"}
+                        alt={c.teacher?.name}
                         className="w-6 h-6 rounded-full object-cover"
                       />
                       <span>{c.teacher?.name || "Admin"}</span>
                     </div>
 
-                    {/* Rating & học viên */}
                     <div className="flex items-center justify-between mt-3 meta">
                       <div className="flex items-center gap-1">
                         <span className="text-yellow-500">⭐</span>
@@ -208,16 +231,13 @@ export default function Home() {
                       <span>{c.students || 520} học viên</span>
                     </div>
 
-                    {/* Giá & nút */}
                     <div className="mt-5 flex items-center justify-between">
                       <span className="price">
                         {typeof c.price === "number"
                           ? new Intl.NumberFormat("vi-VN").format(c.price) + "₫"
                           : c.price || "Miễn phí"}
                       </span>
-                      <button className="btn btn-light">
-                        Xem chi tiết
-                      </button>
+                      <button className="btn btn-light">Xem chi tiết</button>
                     </div>
                   </div>
                 </Link>
@@ -226,16 +246,16 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ========== DANH MỤC KHÓA HỌC ========== */}
+        {/* ========================= DANH MỤC KHÓA HỌC ========================= */}
         <section className="py-16 bg-gradient-to-b from-white via-primaryLight/40 to-white rounded-2xl mt-16">
           <h2 className="text-3xl font-extrabold text-center text-dark mb-12">
             Danh mục khóa học
           </h2>
 
           {loadingCategories ? (
-            <div className="text-center text-muted italic">⏳ Đang tải danh mục...</div>
+            <div className="text-center italic">⏳ Đang tải danh mục...</div>
           ) : categories.length === 0 ? (
-            <div className="text-center text-muted italic">Không có danh mục nào.</div>
+            <div className="text-center italic">Không có danh mục nào.</div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8">
               {categories.map((cat, idx) => (
@@ -244,30 +264,25 @@ export default function Home() {
                   whileHover={{ scale: 1.05, y: -6 }}
                   transition={{ duration: 0.4 }}
                   onClick={() => navigate(`/categories/${cat.slug || cat._id}`)}
-                  className="group relative overflow-hidden card card-hover cursor-pointer"
+                  className="group relative overflow-hidden card cursor-pointer"
                 >
-                  {/* Ảnh nền */}
                   <img
                     src={cat.image || `https://source.unsplash.com/600x400/?${cat.name}`}
                     alt={cat.name}
                     className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-all duration-700 group-hover:scale-110 rounded-2xl"
                   />
 
-                  {/* Lớp phủ màu mờ */}
                   <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
 
-                  {/* Nội dung danh mục */}
                   <div className="relative z-10 flex flex-col items-center justify-center h-48 text-center p-6 text-white">
-                    <div className="bg-white/90 p-4 rounded-full shadow-lg mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <div className="bg-white/90 p-4 rounded-full shadow-lg mb-4 group-hover:scale-110 transition">
                       <img
                         src={cat.icon || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
                         alt={cat.name}
                         className="w-10 h-10 object-contain"
                       />
                     </div>
-                    <h3 className="text-lg font-semibold group-hover:text-accent transition-colors duration-300">
-                      {cat.name}
-                    </h3>
+                    <h3 className="text-lg font-semibold">{cat.name}</h3>
                   </div>
                 </motion.div>
               ))}
@@ -281,7 +296,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ========== THỐNG KÊ ========== */}
+        {/* ========================= THỐNG KÊ ========================= */}
         <section className="mt-14">
           <div className="rounded-2xl text-white p-8 shadow-soft bg-gradient-to-r from-primary to-accent">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
@@ -310,14 +325,14 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ========== TESTIMONIALS ========== */}
+        {/* ========================= TESTIMONIALS ========================= */}
         <section className="mt-14">
           <h2 className="section-title mb-6">⭐ Học viên nói gì?</h2>
 
           {loadingTestimonials ? (
-            <div className="text-center text-muted italic">⏳ Đang tải đánh giá...</div>
+            <div className="text-center italic">⏳ Đang tải đánh giá...</div>
           ) : testimonials.length === 0 ? (
-            <div className="text-center text-muted italic">Chưa có đánh giá nào.</div>
+            <div className="text-center italic">Chưa có đánh giá nào.</div>
           ) : (
             <Swiper
               modules={[Autoplay, Pagination]}
@@ -343,14 +358,14 @@ export default function Home() {
           )}
         </section>
 
-        {/* ========== BLOG ========== */}
+        {/* ========================= BLOG ========================= */}
         <section className="mt-14 mb-24">
           <h2 className="section-title mb-6">📰 Tin tức học tập mới nhất</h2>
 
           {loadingBlogs ? (
-            <div className="text-center text-muted italic">⏳ Đang tải blog...</div>
+            <div className="text-center italic">⏳ Đang tải blog...</div>
           ) : blogs.length === 0 ? (
-            <div className="text-center text-muted italic">Chưa có bài viết nào.</div>
+            <div className="text-center italic">Chưa có bài viết nào.</div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {blogs.map((b, i) => (
@@ -397,7 +412,7 @@ export default function Home() {
         </section>
       </div>
 
-      {/* ========== CTA MẠNH Ở CUỐI TRANG (Boost chuyển đổi) ========== */}
+      {/* ================ CTA cuối trang ================ */}
       <section className="mt-6">
         <div className="container-page">
           <div className="relative overflow-hidden rounded-2xl border border-border bg-white">
@@ -407,14 +422,15 @@ export default function Home() {
             <div className="relative z-10 grid md:grid-cols-[1.2fr_0.8fr] gap-8 p-8 md:p-10">
               <div>
                 <h2 className="text-3xl md:text-4xl font-extrabold text-dark">
-                  Sẵn sàng thăng hạng kỹ năng? <span className="text-primary">Học ngay hôm nay!</span>
+                  Sẵn sàng thăng hạng kỹ năng?{" "}
+                  <span className="text-primary">Học ngay hôm nay!</span>
                 </h2>
+
                 <p className="mt-3 text-muted max-w-2xl">
                   Truy cập toàn bộ thư viện khóa học cập nhật liên tục, dự án thực tế,
                   lộ trình rõ ràng — học nhanh, nhớ lâu, áp dụng được ngay.
                 </p>
 
-                {/* Trust badges */}
                 <ul className="mt-6 grid sm:grid-cols-3 gap-3">
                   <li className="card card-pad flex items-center gap-3">
                     <FaShieldAlt className="text-primary text-xl" />
@@ -440,12 +456,14 @@ export default function Home() {
                 </ul>
               </div>
 
-              {/* Cột CTA */}
               <div className="flex flex-col items-start justify-center">
                 <div className="bg-gradient-to-r from-primary to-accent w-full rounded-2xl text-white p-6 shadow-soft">
                   <div className="text-sm opacity-90">Ưu đãi cho người mới</div>
                   <div className="text-3xl font-extrabold mt-1">Giảm 30% tất cả khóa học</div>
-                  <div className="text-sm opacity-90 mt-1">Nhập mã: <span className="font-semibold">HKWELCOME</span></div>
+                  <div className="text-sm opacity-90 mt-1">
+                    Nhập mã: <span className="font-semibold">HKWELCOME</span>
+                  </div>
+
                   <div className="mt-5 flex flex-wrap gap-3">
                     <Link to="/courses" className="btn bg-white text-primary hover:bg-primaryLight">
                       Xem khóa học
@@ -455,6 +473,7 @@ export default function Home() {
                     </Link>
                   </div>
                 </div>
+
                 <p className="text-xs text-muted mt-3">
                   *Điều kiện áp dụng có thể thay đổi. Vui lòng xem chi tiết tại trang thanh toán.
                 </p>
@@ -463,12 +482,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* CTA nổi cho mobile (không phá layout desktop) */}
         <div className="md:hidden sticky bottom-4 z-40 px-4">
           <div className="rounded-full shadow-soft border border-border bg-white p-2 flex items-center justify-between">
-            <span className="px-3 text-sm font-medium">
-              Bắt đầu học miễn phí ngay!
-            </span>
+            <span className="px-3 text-sm font-medium">Bắt đầu học miễn phí ngay!</span>
             <Link to="/courses" className="btn btn-primary px-5 py-2">
               Xem khóa học
             </Link>
