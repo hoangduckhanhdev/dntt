@@ -1,0 +1,224 @@
+// src/components/feed/FeedComposer.jsx
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+
+const API_BASE = "http://localhost:5000/api";
+
+// 🔐 Helper: lấy config axios có kèm token
+const getAuthConfig = () => {
+  try {
+    const token = localStorage.getItem("token");
+    const headers = {};
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return {
+      headers,
+      withCredentials: true,
+    };
+  } catch {
+    return { withCredentials: true };
+  }
+};
+
+export default function FeedComposer({ onPosted }) {
+  const [user, setUser] = useState(null);
+
+  const [type, setType] = useState("question");
+  const [content, setContent] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // MEDIA
+  const [uploading, setUploading] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaType, setMediaType] = useState("image");
+
+  // Lấy user thật từ localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        setUser(JSON.parse(stored));
+      }
+    } catch (err) {
+      console.error("Parse user error:", err);
+    }
+  }, []);
+
+  // Chưa đăng nhập thì không hiển thị composer
+  if (!user) return null;
+
+  const role = user.role || "student";
+
+  // Loại bài post tuỳ theo role
+  const typeOptions =
+    role === "student"
+      ? [
+          { value: "question", label: "Câu hỏi" },
+          { value: "lesson_suggestion", label: "Chia sẻ bài học" },
+          { value: "blog", label: "Bài viết cá nhân" },
+        ]
+      : [
+          { value: "lesson_suggestion", label: "Bài học gợi ý" },
+          { value: "question", label: "Câu hỏi" },
+          { value: "blog", label: "Blog giáo viên" },
+          { value: "announcement", label: "Thông báo" },
+          { value: "mini_quiz", label: "Mini quiz (text)"},
+        ];
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    // backend uploadRoutes đang dùng field "image" (kể cả video nếu resource_type: 'auto')
+    formData.append("image", file);
+
+    try {
+      setUploading(true);
+
+      const baseConfig = getAuthConfig();
+
+      const res = await axios.post(
+        `${API_BASE}/upload/image`,
+        formData,
+        {
+          ...baseConfig,
+          headers: {
+            ...baseConfig.headers,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      const url = res.data.url;
+      setMediaUrl(url);
+
+      if (file.type.startsWith("video/")) {
+        setMediaType("video");
+      } else {
+        setMediaType("image");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Upload file thất bại");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Cho phép bài chỉ có media (không bắt buộc text)
+    if (!content.trim() && !mediaUrl) return;
+
+    try {
+      setLoading(true);
+
+      await axios.post(
+        `${API_BASE}/feed`,
+        {
+          type,
+          content,
+          media: mediaUrl
+            ? {
+                url: mediaUrl,
+                type: mediaType,
+              }
+            : undefined,
+        },
+        getAuthConfig() // 🔥 gửi kèm Authorization + withCredentials
+      );
+
+      setContent("");
+      setMediaUrl("");
+      setMediaType("image");
+      onPosted && onPosted();
+    } catch (err) {
+      console.error(err);
+      alert("Đăng bài thất bại");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="border rounded-xl p-3 bg-white shadow-sm mb-3"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <select
+          className="border rounded px-2 py-1 text-sm"
+          value={type}
+          onChange={(e) => setType(e.target.value)}
+        >
+          {typeOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-gray-500">
+          Đăng câu hỏi, chia sẻ bài học, kinh nghiệm...
+        </span>
+      </div>
+
+      <textarea
+        rows={3}
+        className="w-full border rounded px-2 py-1 text-sm"
+        placeholder="Viết nội dung bài chia sẻ, câu hỏi, ghi chú bài học..."
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+      />
+
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center gap-2">
+          <label className="text-xs cursor-pointer border rounded px-2 py-1 bg-slate-50 hover:bg-slate-100">
+            {uploading ? "Đang upload..." : "📷 Thêm ảnh / video"}
+            <input
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </label>
+          {mediaUrl && (
+            <span className="text-xs text-green-600">
+              Đã chọn {mediaType === "video" ? "video" : "ảnh"}
+            </span>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-4 py-1 rounded bg-blue-600 text-white text-sm"
+        >
+          {loading ? "Đang đăng..." : "Đăng"}
+        </button>
+      </div>
+
+      {mediaUrl && (
+        <div className="mt-3">
+          {mediaType === "image" ? (
+            <img
+              src={mediaUrl}
+              alt="preview"
+              className="max-h-40 rounded-lg object-cover"
+            />
+          ) : (
+            <video
+              src={mediaUrl}
+              controls
+              className="max-h-40 rounded-lg object-cover"
+            />
+          )}
+        </div>
+      )}
+    </form>
+  );
+}

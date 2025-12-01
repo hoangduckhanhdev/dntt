@@ -1,0 +1,237 @@
+import React, { useState, useRef, useEffect } from "react";
+import { LogOut, Bell, Search, User, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:5000", {
+  transports: ["websocket"],
+  reconnection: true,
+});
+
+export default function TopbarAdmin({ title = "" }) {
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [admin, setAdmin] = useState({});
+  const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
+
+  // ✅ Lấy thông tin admin
+  useEffect(() => {
+    const fetchAdmin = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://localhost:5000/api/admin/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setAdmin(res.data || {});
+      } catch (err) {
+        console.error("Lỗi tải thông tin admin:", err);
+        setAdmin({});
+      }
+    };
+    fetchAdmin();
+  }, []);
+
+  // ✅ Lấy thông báo ban đầu
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://localhost:5000/api/admin/notifications", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = res.data.data || [];
+        setNotifications(data);
+        setUnreadCount(data.filter((n) => !n.isRead).length);
+      } catch (err) {
+        console.error("Lỗi tải thông báo:", err);
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ✅ Lắng nghe thông báo realtime từ Socket.IO
+  useEffect(() => {
+    socket.on("notification:new", (notif) => {
+      console.log("📩 Nhận thông báo mới:", notif);
+      setNotifications((prev) => [notif, ...prev]);
+      setUnreadCount((prev) => prev + 1);
+    });
+
+    return () => {
+      socket.off("notification:new");
+    };
+  }, []);
+
+  // ✅ Ẩn dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotif(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // ✅ Đánh dấu đã đọc khi mở danh sách
+  const handleToggleNotif = async () => {
+    setShowNotif(!showNotif);
+    if (!showNotif && unreadCount > 0) {
+      try {
+        const token = localStorage.getItem("token");
+        await axios.put(
+          "http://localhost:5000/api/admin/notifications/mark-read",
+          {},
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setUnreadCount(0);
+      } catch (err) {
+        console.error("Lỗi đánh dấu thông báo đã đọc:", err);
+      }
+    }
+  };
+
+  // ✅ Đăng xuất
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
+
+  return (
+    <header className="flex items-center justify-between px-6 py-3 bg-gradient-to-r from-orange-50 to-amber-50 backdrop-blur-md border-b border-orange-200 sticky top-0 z-40 shadow-sm">
+      {/* ====== Title ====== */}
+      <div className="text-xl font-semibold text-gray-800 tracking-wide flex items-center gap-2">
+        <span>📊</span> {title || "Bảng điều khiển"}
+      </div>
+
+      {/* ====== Actions ====== */}
+      <div className="flex items-center gap-4">
+        {/* Search */}
+        <div className="relative hidden md:block">
+          <input
+            type="text"
+            placeholder="Tìm kiếm..."
+            className="pl-9 pr-3 py-2 rounded-lg border border-orange-200 bg-white text-sm shadow-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-300 w-64 transition-all"
+          />
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+        </div>
+
+        {/* Notifications */}
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={handleToggleNotif}
+            className="relative p-2 rounded-full hover:bg-orange-200 transition-all cursor-pointer"
+          >
+            <Bell size={20} className="text-orange-600" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 text-xs w-5 h-5 flex items-center justify-center rounded-full bg-red-500 text-white font-semibold">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {showNotif && (
+            <div className="absolute right-0 mt-2 w-96 bg-white shadow-lg border border-orange-200 rounded-lg overflow-hidden z-50 animate-fadeIn">
+              {notifications.length === 0 ? (
+                <div className="p-4 text-sm text-gray-500 text-center">
+                  Không có thông báo mới
+                </div>
+              ) : (
+                notifications.map((notif) => (
+                  <div
+                    key={notif._id || notif.id}
+                    className="p-3 border-b border-gray-100 hover:bg-orange-50 cursor-pointer"
+                    onClick={() =>
+                      notif.link ? navigate(notif.link) : setShowNotif(false)
+                    }
+                  >
+                    <p className="text-sm font-medium text-gray-700">
+                      {notif.title}
+                    </p>
+                    <p className="text-sm text-gray-600">{notif.message}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(notif.createdAt).toLocaleString("vi-VN")}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Profile dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="flex items-center gap-2 bg-white hover:bg-orange-50 border border-orange-200 shadow-sm px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer"
+          >
+            <img
+              src={admin.avatar || "https://i.pravatar.cc/32?img=12"}
+              alt="avatar"
+              className="w-9 h-9 rounded-full border border-gray-200"
+            />
+            <div className="hidden md:flex flex-col text-left">
+              <span className="text-sm font-semibold text-gray-700">
+                {admin.name || "Admin"}
+              </span>
+              <span className="text-xs text-gray-500">
+                {admin.email || "admin@example.com"}
+              </span>
+            </div>
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-orange-200 overflow-hidden z-50 animate-fadeIn">
+              <div className="px-4 py-3 border-b border-gray-100 flex flex-col gap-1">
+                <p className="font-semibold text-gray-700">
+                  {admin.name || "Admin"}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {admin.email || "admin@example.com"}
+                </p>
+                <p className="text-xs text-gray-400">{admin.role || "Admin"}</p>
+              </div>
+
+              <button
+                onClick={() => navigate("/admin/profile")}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-orange-50"
+              >
+                <User size={16} /> Hồ sơ
+              </button>
+              <button
+                onClick={() => navigate("/admin/settings")}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-orange-50"
+              >
+                <Settings size={16} /> Cài đặt
+              </button>
+
+              <hr />
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              >
+                <LogOut size={16} /> Đăng xuất
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

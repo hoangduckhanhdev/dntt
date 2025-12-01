@@ -1,0 +1,523 @@
+// src/pages/TeacherExamDetail.jsx
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+
+import examApi from "../api/examApi";
+import axios from "axios";
+
+const API_BASE = "http://localhost:5000/api";
+
+export default function TeacherExamDetail() {
+  const { id } = useParams(); // examId
+  const [exam, setExam] = useState(null);
+  const [attempts, setAttempts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [selectedAttemptId, setSelectedAttemptId] = useState(null);
+  const [attemptDetail, setAttemptDetail] = useState(null);
+  const [gradingSaving, setGradingSaving] = useState(false);
+
+  // loading riêng cho AI theo câu hỏi
+  const [aiLoadingQId, setAiLoadingQId] = useState(null);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [examData, attemptList] = await Promise.all([
+        examApi.admin.getExam(id), // GET /api/admin/exams/:id
+        examApi.admin.getExamAttempts(id), // GET /api/admin/exams/:id/attempts
+      ]);
+      setExam(examData);
+      setAttempts(attemptList || []);
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi tải dữ liệu đề thi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [id]);
+
+  const loadAttemptDetail = async (attemptId) => {
+    try {
+      setSelectedAttemptId(attemptId);
+      const data = await examApi.admin.getAttemptDetail(id, attemptId); // GET attempt detail
+      setAttemptDetail(data);
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi tải chi tiết bài làm");
+    }
+  };
+
+  const handleChangeScore = (questionId, field, value) => {
+    setAttemptDetail((prev) => {
+      if (!prev) return prev;
+      const newAnswers = prev.answers.map((a) =>
+        String(a.question._id || a.question) === String(questionId)
+          ? { ...a, [field]: value }
+          : a
+      );
+      return { ...prev, answers: newAnswers };
+    });
+  };
+
+  const handleSaveGrading = async () => {
+    if (!attemptDetail) return;
+    try {
+      setGradingSaving(true);
+      const answersPayload = attemptDetail.answers.map((a) => ({
+        question: a.question._id || a.question,
+        score: Number(a.score) || 0,
+        maxScore: Number(a.maxScore) || 0,
+        teacherComment: a.teacherComment || "",
+      }));
+
+      await examApi.admin.gradeAttempt(
+        id,
+        attemptDetail._id,
+        answersPayload
+      ); // POST/PUT /api/admin/exams/:id/attempts/:attemptId/grade
+
+      alert("Lưu chấm điểm thành công");
+      setSelectedAttemptId(null);
+      setAttemptDetail(null);
+      loadData(); // reload list
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.message || "Lưu chấm điểm thất bại");
+    } finally {
+      setGradingSaving(false);
+    }
+  };
+
+  const togglePublish = async () => {
+    try {
+      const newStatus = !exam.isPublished;
+      const updated = await examApi.admin.publishExam(id, newStatus); // PUT /publish
+      setExam(updated);
+    } catch (err) {
+      console.error(err);
+      alert("Không thể đổi trạng thái xuất bản");
+    }
+  };
+
+  // ================== GỌI AI GỢI Ý ĐIỂM & NHẬN XÉT ==================
+  const handleAiSuggest = async (answer) => {
+    const q = answer.question;
+    const questionId = q._id || q;
+    const studentAnswer = answer.answerText || "";
+
+    if (!studentAnswer.trim()) {
+      alert("Câu này chưa có nội dung tự luận để AI chấm.");
+      return;
+    }
+
+    try {
+      setAiLoadingQId(String(questionId));
+
+      const token = localStorage.getItem("token");
+
+      const res = await axios.post(
+        `${API_BASE}/ai/grade-essay`,
+        {
+          question: q.content,
+          studentAnswer,
+          maxScore: q.score || 10,
+          language: "vi",
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
+
+      const { score, comment } = res.data || {};
+
+      setAttemptDetail((prev) => {
+        if (!prev) return prev;
+        const newAnswers = prev.answers.map((a) => {
+          if (String(a.question._id || a.question) === String(questionId)) {
+            return {
+              ...a,
+              score:
+                typeof score === "number"
+                  ? score
+                  : a.score ?? 0,
+              maxScore: q.score || a.maxScore || 0,
+              teacherComment:
+                (comment ? `[AI gợi ý] ${comment}` : a.teacherComment) ||
+                "",
+            };
+          }
+          return a;
+        });
+        return { ...prev, answers: newAnswers };
+      });
+    } catch (err) {
+      console.error("AI grade error:", err?.response?.data || err);
+      alert(
+        err?.response?.data?.message ||
+          "AI không thể chấm câu này. Bạn hãy chấm thủ công nhé."
+      );
+    } finally {
+      setAiLoadingQId(null);
+    }
+  };
+
+  if (loading) return <div className="p-6">Đang tải...</div>;
+  if (!exam) return <div className="p-6">Không tìm thấy đề thi.</div>;
+
+  const totalAttempts = attempts.length;
+  const submittedAttempts = attempts.filter((a) =>
+    ["submitted", "graded", "timeout"].includes(a.status)
+  );
+  const avgScore =
+    submittedAttempts.length > 0
+      ? (
+          submittedAttempts.reduce(
+            (sum, a) => sum + (a.totalScore || 0),
+            0
+          ) / submittedAttempts.length
+        ).toFixed(2)
+      : null;
+
+  return (
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-dark flex items-center gap-2">
+            📝 {exam.title}
+          </h1>
+          <p className="text-muted mt-1">{exam.description}</p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+              exam.isPublished
+                ? "bg-green-100 text-green-700"
+                : "bg-red-100 text-red-600"
+            }`}
+          >
+            {exam.isPublished ? "Đã xuất bản" : "Nháp"}
+          </span>
+          <button
+            onClick={togglePublish}
+            className="px-4 py-2 bg-primary text-white rounded-lg shadow-soft hover:bg-accent text-sm"
+          >
+            {exam.isPublished ? "Ẩn đề thi" : "Xuất bản đề"}
+          </button>
+        </div>
+      </div>
+
+      {/* Info cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white border border-border rounded-xl p-4 shadow-soft">
+          <div className="text-xs text-muted mb-1">Loại đề</div>
+          <div className="font-semibold capitalize">{exam.type}</div>
+          <div className="text-xs text-muted mt-2">
+            Chế độ:{" "}
+            {exam.selectionMode === "auto"
+              ? "Tự động chọn câu"
+              : "Chọn thủ công"}
+          </div>
+        </div>
+
+        <div className="bg-white border border-border rounded-xl p-4 shadow-soft">
+          <div className="text-xs text-muted mb-1">
+            Thời gian & số lần làm
+          </div>
+          <div className="font-semibold">
+            {exam.timeLimit ? `${exam.timeLimit} phút` : "Không giới hạn"}
+          </div>
+          <div className="text-xs text-muted mt-2">
+            Tối đa {exam.attemptsAllowed} lần, chấm kiểu{" "}
+            <span className="font-semibold">{exam.scoringStrategy}</span>
+          </div>
+        </div>
+
+        <div className="bg-white border border-border rounded-xl p-4 shadow-soft">
+          <div className="text-xs text-muted mb-1">Thống kê cơ bản</div>
+          <div className="font-semibold">
+            {submittedAttempts.length} bài đã nộp / {totalAttempts} lượt làm
+          </div>
+          <div className="text-xs text-muted mt-2">
+            Điểm trung bình:{" "}
+            {avgScore !== null ? <b>{avgScore}</b> : "Chưa có dữ liệu"}
+          </div>
+        </div>
+      </div>
+
+      {/* Attempts table */}
+      <div className="bg-white border border-border rounded-xl shadow-soft overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex justify-between items-center">
+          <h2 className="font-semibold text-dark text-lg">
+            Bài làm của học viên
+          </h2>
+          <span className="text-sm text-muted">
+            Tổng {attempts.length} lượt làm
+          </span>
+        </div>
+
+        <table className="w-full text-sm">
+          <thead className="bg-primaryLight">
+            <tr>
+              <th className="py-2 px-4 text-left">Học viên</th>
+              <th className="py-2 px-4 text-left">Lần</th>
+              <th className="py-2 px-4 text-left">Trạng thái</th>
+              <th className="py-2 px-4 text-left">Điểm</th>
+              <th className="py-2 px-4 text-right">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {attempts.map((at) => (
+              <tr key={at._id} className="border-t border-border">
+                <td className="py-2 px-4">
+                  {at.student?.name || "N/A"}{" "}
+                  <span className="text-xs text-muted">
+                    ({at.student?.email})
+                  </span>
+                </td>
+                <td className="py-2 px-4">{at.attemptIndex}</td>
+                <td className="py-2 px-4">
+                  {at.status === "graded" ? (
+                    <span className="text-green-600 font-semibold">
+                      Đã chấm
+                    </span>
+                  ) : at.status === "submitted" ? (
+                    <span className="text-primary font-semibold">
+                      Đã nộp
+                    </span>
+                  ) : at.status === "timeout" ? (
+                    <span className="text-orange-500 font-semibold">
+                      Hết thời gian
+                    </span>
+                  ) : (
+                    <span className="text-muted">Đang làm</span>
+                  )}
+                </td>
+                <td className="py-2 px-4">
+                  {typeof at.totalScore === "number"
+                    ? `${at.totalScore}/${at.maxScore || "?"}`
+                    : "-"}
+                </td>
+                <td className="py-2 px-4 text-right">
+                  {["submitted", "graded", "timeout"].includes(at.status) ? (
+                    <button
+                      onClick={() => loadAttemptDetail(at._id)}
+                      className="text-primary hover:text-accent font-medium"
+                    >
+                      Xem / chấm
+                    </button>
+                  ) : (
+                    <span className="text-xs text-muted">
+                      Chưa nộp, không xem được
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+
+            {attempts.length === 0 && (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="py-6 px-4 text-center text-muted"
+                >
+                  Chưa có học viên nào làm đề này.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Attempt detail / grading */}
+      {attemptDetail && (
+        <div className="bg-white border border-border rounded-xl shadow-soft p-6">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="font-semibold text-dark text-lg">
+                ✏️ Chấm bài – {attemptDetail.student?.name} (lần{" "}
+                {attemptDetail.attemptIndex})
+              </h3>
+              <p className="text-xs text-muted mt-1">
+                Bạn có thể dùng nút{" "}
+                <span className="font-semibold">“Gợi ý bằng AI”</span> cho
+                các câu tự luận / trả lời ngắn. AI chỉ gợi ý, giáo viên
+                vẫn là người quyết định điểm cuối cùng.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedAttemptId(null);
+                setAttemptDetail(null);
+              }}
+              className="text-sm text-muted hover:text-dark"
+            >
+              Đóng
+            </button>
+          </div>
+
+          <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2">
+            {attemptDetail.answers.map((a, idx) => {
+              const q = a.question;
+              const type = q.type;
+
+              const isEssayLike =
+                type === "essay" || type === "short_answer";
+
+              return (
+                <div
+                  key={q._id}
+                  className="border border-border rounded-lg p-4 bg-primaryLight"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="font-semibold text-dark">
+                      Câu {idx + 1}:{" "}
+                      <span className="font-normal">{q.content}</span>
+                    </div>
+                    <div className="text-xs text-muted text-right">
+                      Loại: {type} – Điểm tối đa: {q.score}
+                      {a.autoGraded && (
+                        <div className="text-[11px] text-green-600">
+                          * Đã được hệ thống tự chấm
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mb-2 text-sm">
+                    <span className="font-semibold">Trả lời: </span>
+                    {type === "multiple_choice" && (
+                      <ul className="list-disc ml-5">
+                        {q.options.map((op) => {
+                          const chosen = (a.selectedOptionIds || []).some(
+                            (id) => String(id) === String(op._id)
+                          );
+                          return (
+                            <li key={op._id}>
+                              {chosen ? "✅" : "⬜"} {op.text}{" "}
+                              {op.isCorrect && (
+                                <span className="text-xs text-green-600">
+                                  (Đáp án đúng)
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+
+                    {type !== "multiple_choice" && (
+                      <div className="mt-1 whitespace-pre-wrap bg-white border border-border rounded p-2">
+                        {a.answerText || "(Không trả lời)"}
+                      </div>
+                    )}
+
+                    {a.fileUrl && (
+                      <div className="mt-2">
+                        <a
+                          href={a.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary underline"
+                        >
+                          Mở file học viên gửi
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-3 mt-3 items-center">
+                    <div>
+                      <label className="block text-xs text-muted mb-1">
+                        Điểm
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full p-2 border border-border rounded-lg"
+                        value={a.score ?? 0}
+                        onChange={(e) =>
+                          handleChangeScore(
+                            q._id,
+                            "score",
+                            e.target.value
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-muted mb-1">
+                        Nhận xét của giáo viên
+                      </label>
+                      <textarea
+                        className="w-full p-2 border border-border rounded-lg text-sm"
+                        rows={2}
+                        value={a.teacherComment || ""}
+                        onChange={(e) =>
+                          handleChangeScore(
+                            q._id,
+                            "teacherComment",
+                            e.target.value
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Nút AI gợi ý chỉ hiện với tự luận / short_answer */}
+                  {isEssayLike && (
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleAiSuggest(a)}
+                        disabled={
+                          aiLoadingQId === String(q._id || q) ||
+                          !a.answerText?.trim()
+                        }
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
+                      >
+                        {aiLoadingQId === String(q._id || q)
+                          ? "AI đang gợi ý..."
+                          : "Gợi ý điểm & nhận xét bằng AI"}
+                      </button>
+                      <span className="text-[11px] text-muted">
+                        AI chỉ mang tính tham khảo, bạn có thể chỉnh sửa lại
+                        điểm & nhận xét.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setSelectedAttemptId(null);
+                setAttemptDetail(null);
+              }}
+              className="px-4 py-2 rounded-lg border border-border text-sm text-muted hover:bg-gray-50"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={handleSaveGrading}
+              disabled={gradingSaving}
+              className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-semibold shadow-soft hover:bg-accent disabled:opacity-60"
+            >
+              {gradingSaving ? "Đang lưu..." : "Lưu điểm & nhận xét"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

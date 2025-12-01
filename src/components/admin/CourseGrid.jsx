@@ -1,0 +1,31 @@
+import React from "react";
+import { Edit2, Trash2 } from "lucide-react";
+
+const CourseGrid = ({ courses = [], onDelete, onEdit }) => {
+  if (!courses.length) return <p className="text-gray-500">Không có khóa học.</p>;
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      {courses.map((c) => (
+        <div key={c._id} className="border p-4 rounded-lg shadow-sm">
+          <div className="flex justify-between items-start">
+            <div>
+              <h4 className="font-semibold text-lg text-orange-600">{c.title}</h4>
+              <p className="text-sm text-gray-600">{c.description}</p>
+              <div className="text-xs text-gray-500 mt-2">{c.category}</div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => onEdit(c._id)} className="px-3 py-1 rounded bg-blue-50 text-blue-600">
+                <Edit2 size={14} />
+              </button>
+              <button onClick={() => onDelete(c._id)} className="px-3 py-1 rounded bg-red-50 text-red-600">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default CourseGrid;

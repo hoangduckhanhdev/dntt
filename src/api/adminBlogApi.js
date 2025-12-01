@@ -1,0 +1,82 @@
+import axios from "axios";
+
+const getToken = () => localStorage.getItem("token");
+
+const api = axios.create({
+  baseURL: "http://localhost:5000/api/admin/blogs",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${getToken()}`,
+  },
+});
+
+export const getAllBlogs = async () => {
+  try {
+    const res = await api.get("/", {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Error getAllBlogs:", err.response || err);
+    throw err;
+  }
+};
+
+export const createBlog = async (blogData) => {
+  try {
+    const formData = new FormData();
+
+    formData.append("title", blogData.get("title") || "");
+    formData.append("content", blogData.get("content") || "");
+    if (blogData.get("category")) formData.append("category", blogData.get("category"));
+    if (blogData.get("tags")) formData.append("tags", blogData.get("tags"));
+    if (blogData.get("thumbnail")) formData.append("thumbnail", blogData.get("thumbnail"));
+
+    const res = await api.post("/", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${getToken()}`,
+      },
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Error createBlog:", err.response?.data || err);
+    throw err;
+  }
+};
+
+// Giữ nguyên updateBlog
+export const updateBlog = async (id, formData) => {
+  try {
+    const res = await api.put(`/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${getToken()}`,
+      },
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Error updateBlog:", err.response?.data || err);
+    throw err;
+  }
+};
+
+export const deleteBlog = async (id) => {
+  try {
+    const res = await api.delete(`/${id}`);
+    return res.data;
+  } catch (err) {
+    console.error("Error deleteBlog:", err.response || err);
+    throw err;
+  }
+};
+
+export const searchBlogs = async (query) => {
+  try {
+    const res = await api.get(`/search?query=${encodeURIComponent(query)}`);
+    return res.data;
+  } catch (err) {
+    console.error("Error searchBlogs:", err.response || err);
+    throw err;
+  }
+};

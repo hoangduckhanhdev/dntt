@@ -1,0 +1,188 @@
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { motion } from "framer-motion";
+import * as Icons from "lucide-react"; 
+
+export default function About() {
+  const [about, setAbout] = useState(null);
+
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/api/about")
+      .then((res) => setAbout(res.data))
+      .catch((err) => console.error("Lỗi tải dữ liệu:", err));
+  }, []);
+
+  if (!about) return <div className="text-center py-10">Đang tải...</div>;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white">
+     
+      {about.image && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1 }}
+          className="relative w-full max-w-6xl mx-auto rounded-2xl overflow-hidden shadow-lg mt-8"
+        >
+          <img
+            src={about.image}
+            alt="Giới thiệu LearnCode"
+            className="w-full h-[400px] object-cover"
+          />
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <h1 className="text-white text-3xl md:text-5xl font-bold drop-shadow-lg text-center leading-snug whitespace-pre-line">
+              {about.title}
+            </h1>
+          </div>
+        </motion.div>
+      )}
+
+
+      <div className="max-w-6xl mx-auto px-6 py-12 text-center">
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+          className="text-gray-700 text-lg mb-12 leading-relaxed"
+        >
+          {about.content}
+        </motion.p>
+
+        <div className="grid md:grid-cols-2 gap-8 mb-12">
+          <motion.div
+            whileHover={{ scale: 1.03 }}
+            className="p-6 bg-white rounded-2xl shadow-md border border-purple-100"
+          >
+            <h2 className="text-2xl font-semibold text-purple-600 mb-3">🎯 Sứ mệnh</h2>
+            <p className="text-gray-600">{about.mission}</p>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.03 }}
+            className="p-6 bg-white rounded-2xl shadow-md border border-purple-100"
+          >
+            <h2 className="text-2xl font-semibold text-purple-600 mb-3">🌟 Tầm nhìn</h2>
+            <p className="text-gray-600">{about.vision}</p>
+          </motion.div>
+        </div>
+
+        {about.values && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="bg-purple-50 p-8 rounded-2xl mb-12 shadow-sm"
+          >
+            <h2 className="text-2xl font-bold text-purple-700 mb-4">💎 Giá trị cốt lõi</h2>
+            <p className="text-gray-700">{about.values}</p>
+          </motion.div>
+        )}
+
+        {about.features && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            transition={{ duration: 1 }}
+            className="mb-16"
+          >
+            <h2 className="text-2xl font-bold text-purple-700 mb-8">🚀 Tính năng nổi bật</h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+              {about.features.map((item, index) => {
+                const IconComponent = Icons[item.icon] || Icons.Star;
+                return (
+                  <motion.div
+                    key={index}
+                    whileHover={{ scale: 1.03 }}
+                    className="p-6 bg-white rounded-2xl shadow-md border border-purple-100 flex items-start gap-4"
+                  >
+                    <IconComponent className="text-purple-600 w-8 h-8 flex-shrink-0" />
+                    <p className="text-gray-700">{item.text}</p>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {about.gallery && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            transition={{ duration: 0.8 }}
+            className="mb-16"
+          >
+            <h2 className="text-2xl font-bold text-purple-700 mb-6">📸 Khoảnh khắc LearnCode</h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {about.gallery.map((img, idx) => (
+                <motion.img
+                  key={idx}
+                  src={img}
+                  alt={`Gallery ${idx}`}
+                  whileHover={{ scale: 1.05 }}
+                  className="rounded-2xl shadow-md object-cover h-48 w-full"
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {about.video && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            transition={{ duration: 1 }}
+            className="max-w-5xl mx-auto mt-12"
+          >
+            <h2 className="text-2xl font-bold text-purple-700 mb-6 text-center">
+              🎥 Video giới thiệu LearnCode
+            </h2>
+            <div className="relative w-full pt-[56.25%] rounded-2xl overflow-hidden shadow-lg">
+              <iframe
+                src={about.video.replace("watch?v=", "embed/")}
+                title="Video giới thiệu LearnCode"
+                className="absolute top-0 left-0 w-full h-full"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
+            </div>
+          </motion.div>
+        )}
+        {about.explore && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="relative text-center py-20 rounded-2xl mt-16 overflow-hidden shadow-xl"
+          >
+            {about.explore.background && (
+              <img
+                src={about.explore.background}
+                alt="Explore background"
+                className="absolute inset-0 w-full h-full object-cover opacity-30"
+              />
+            )}
+
+            <div className="relative z-10 max-w-3xl mx-auto">
+              <h2 className="text-3xl md:text-4xl font-bold text-purple-700 mb-4">
+                {about.explore.title}
+              </h2>
+              <p className="text-gray-700 text-lg mb-8">{about.explore.subtitle}</p>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => (window.location.href = about.explore.buttonLink)}
+                className="px-8 py-3 bg-purple-600 text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition-colors duration-300"
+              >
+                {about.explore.buttonText}
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+
+
+      </div>
+    </div>
+  );
+}

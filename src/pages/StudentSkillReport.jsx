@@ -1,0 +1,320 @@
+// src/pages/StudentSkillReport.jsx
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import aiAdvisorApi from "../api/aiAdvisorApi";
+
+export default function StudentSkillReport() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const state = location.state || {};
+  const courseId = state.courseId || null;
+  const exam = state.exam || null;
+  const attempt = state.attempt || null;
+
+  const [aiResult, setAiResult] = useState(state.aiResult || null);
+  const [loading, setLoading] = useState(!state.aiResult);
+  const [error, setError] = useState("");
+
+  // Nếu thiếu dữ liệu thì báo lỗi và hiển thị nút quay lại
+  useEffect(() => {
+    if (!courseId || !exam || !attempt) {
+      setError(
+        "Thiếu dữ liệu bài thi. Vui lòng quay lại trang bài kiểm tra."
+      );
+    }
+  }, [courseId, exam, attempt]);
+
+  // Gọi AI nếu không có sẵn trong state
+  useEffect(() => {
+    const fetchAi = async () => {
+      if (!courseId || !exam || !attempt) return;
+      if (aiResult) return;
+
+      try {
+        setLoading(true);
+        setError("");
+
+        let res;
+        if (exam.type === "entry_test") {
+          res = await aiAdvisorApi.generateSkillMapFromEntryTest({
+            courseId,
+            userId: attempt.student || attempt.user,
+            examId: exam._id,
+            attemptId: attempt._id,
+          });
+          setAiResult({ mode: "entry_test", payload: res });
+        } else {
+          res = await aiAdvisorApi.analyzeLearningPathAfterExam({
+            courseId,
+            userId: attempt.student || attempt.user,
+            examId: exam._id,
+            attemptId: attempt._id,
+          });
+          setAiResult({ mode: "exam_analysis", payload: res });
+        }
+      } catch (err) {
+        console.error("AI error:", err);
+        setError(
+          err?.response?.data?.message ||
+            "Không lấy được phân tích kỹ năng từ AI."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!aiResult) fetchAi();
+  }, [aiResult, courseId, exam, attempt]);
+
+  // Nếu không có state thì chặn ngay từ đầu, KHÔNG đụng vào attempt/createdAt nữa
+  if (!courseId || !exam || !attempt) {
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="bg-white rounded-xl border shadow-soft p-6 text-center">
+          <p className="text-sm text-red-600 mb-3">{error}</p>
+          <button
+            onClick={() => navigate("/my-courses")}
+            className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600"
+          >
+            Về khoá học của tôi
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Từ đây trở xuống chắc chắn đã có attempt, nhưng vẫn nên check field bên trong
+  const att = attempt || {};
+
+  const canViewScore =
+    exam?.showScoreToStudent !== false &&
+    typeof att.totalScore === "number" &&
+    typeof att.maxScore === "number";
+
+  const percent =
+    canViewScore && att.maxScore > 0
+      ? Math.round((att.totalScore / att.maxScore) * 100)
+      : 0;
+
+  const createdAtText = att.createdAt
+    ? new Date(att.createdAt).toLocaleString("vi-VN")
+    : "--";
+
+  /** Chuẩn hoá dữ liệu AI */
+  const normalized = (() => {
+    if (!aiResult?.payload) return {};
+
+    if (aiResult.mode === "entry_test") {
+      const ai = aiResult.payload.ai || {};
+      return {
+        type: "entry_test",
+        skillLevels: ai.skillLevels || {},
+        suggestedSkills: ai.suggestedSkills || [],
+        path: ai.recommendedPath || [],
+        summary: ai.summary || "",
+      };
+    }
+
+    if (aiResult.mode === "exam_analysis") {
+      const ai = aiResult.payload.ai || {};
+      return {
+        type: "exam_analysis",
+        weakSkills: ai.weakSkills || [],
+        shouldReview: ai.shouldReview || [],
+        recommendations: ai.recommendations || [],
+        summary: ai.summary || "",
+      };
+    }
+
+    return {};
+  })();
+
+  /** TEXT MINDMAP */
+  const renderMindmap = () => {
+    if (!aiResult?.payload) return null;
+
+    return (
+      <div className="mt-6 bg-violet-50 border border-violet-200 rounded-xl p-4">
+        <h2 className="font-semibold text-violet-700 mb-2">
+          🧠 Sơ đồ tư duy kiến thức (AI - dạng chữ)
+        </h2>
+        <p className="text-xs text-gray-600 mb-2">
+          Đây là phiên bản sơ đồ tư duy dạng chữ. Bên dưới là bản sơ đồ tư duy
+          hình ảnh do AI tạo ra.
+        </p>
+
+        {normalized.type === "entry_test" && (
+          <ul className="text-xs text-gray-700 space-y-2">
+            {normalized.path.map((topic, idx) => (
+              <li key={idx}>
+                <span className="font-semibold">
+                  Bước {idx + 1}: {topic}
+                </span>
+                <ul className="list-disc ml-5 mt-1">
+                  <li>Ôn lại lý thuyết liên quan.</li>
+                  <li>Làm bài tập áp dụng.</li>
+                  <li>Ghi chú lỗi sai.</li>
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {normalized.type === "exam_analysis" && (
+          <ul className="text-xs text-gray-700 space-y-2">
+            {normalized.shouldReview.map((topic, idx) => (
+              <li key={idx}>
+                <span className="font-semibold">{topic}</span>
+                <ul className="list-disc ml-5 mt-1">
+                  <li>Xem lại bài giảng.</li>
+                  <li>Làm lại câu sai.</li>
+                  <li>Ghi chú công thức đúng.</li>
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-6">
+      {/* HEADER */}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">
+            Khoá học:{" "}
+            <span className="font-semibold text-gray-700">
+              {exam?.courseTitle || exam?.course?.title || "—"}
+            </span>
+          </p>
+          <h1 className="text-xl font-bold text-slate-800">
+            📊 Báo cáo kỹ năng sau bài kiểm tra
+          </h1>
+          <p className="text-xs text-gray-500 mt-1">
+            Bài: {exam?.title} – Lần làm: {createdAtText}
+          </p>
+        </div>
+
+        <button
+          onClick={() => navigate(-1)}
+          className="px-3 py-1.5 rounded-lg border text-xs text-gray-600 hover:bg-gray-50"
+        >
+          ← Quay lại
+        </button>
+      </div>
+
+      {/* MAIN BOX */}
+      <div className="bg-white rounded-xl border shadow-soft p-5">
+        {/* SCORE */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            {canViewScore ? (
+              <>
+                <p className="text-sm text-slate-600 mb-1">
+                  Kết quả tổng quan của bạn:
+                </p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-orange-600">
+                    {att.totalScore}
+                  </span>
+                  <span className="text-slate-500">
+                    / {att.maxScore} ({percent}%)
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-slate-600">
+                Điểm sẽ được cập nhật sau.
+              </p>
+            )}
+          </div>
+
+          <div className="text-xs text-gray-500">
+            Tổng số câu:{" "}
+            <span className="font-semibold">{att.answers?.length || 0}</span>
+          </div>
+        </div>
+
+        {/* AI SUMMARY */}
+        <h2 className="font-semibold text-slate-800 mb-2">
+          🎯 Nhận xét chung của AI
+        </h2>
+
+        {loading && <p className="text-xs text-gray-500">Đang phân tích…</p>}
+        {error && (
+          <p className="text-xs text-red-600 mb-2">
+            Không lấy được dữ liệu AI: {error}
+          </p>
+        )}
+
+        {!loading && aiResult && normalized.summary && (
+          <p className="text-sm text-gray-700 mb-3">{normalized.summary}</p>
+        )}
+
+        {/* AI DETAILS */}
+        {!loading && aiResult && normalized.type === "exam_analysis" && (
+          <>
+            {normalized.weakSkills.length > 0 && (
+              <div className="mb-2">
+                <p className="text-xs font-semibold text-gray-700 mb-1">
+                  Kỹ năng còn yếu:
+                </p>
+                <p className="text-xs text-gray-700">
+                  {normalized.weakSkills.join(", ")}
+                </p>
+              </div>
+            )}
+
+            {normalized.recommendations.length > 0 && (
+              <div className="mb-2">
+                <p className="text-xs font-semibold text-gray-700 mb-1">
+                  Gợi ý cụ thể:
+                </p>
+                <ul className="text-xs text-gray-700 list-disc pl-5 space-y-1">
+                  {normalized.recommendations.map((r, idx) => (
+                    <li key={idx}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TEXT MINDMAP */}
+        {renderMindmap()}
+
+        {/* IMAGE MINDMAP (AI) */}
+        <div className="mt-6">
+          <h2 className="font-semibold text-violet-700 mb-2">
+            🧩 Sơ đồ tư duy (AI tạo hình ảnh)
+          </h2>
+
+          <img
+            src={`${import.meta.env.VITE_API_URL}/api/learning/mindmap-image/${
+              attempt._id
+            }`}
+            alt="AI Mindmap"
+            className="w-full rounded-xl border shadow bg-white object-contain max-h-[600px]"
+          />
+        </div>
+
+        {/* FOOTER */}
+        <div className="mt-6 flex justify-between items-center">
+          <button
+            onClick={() => navigate("/my-courses")}
+            className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600"
+          >
+            Về khoá học của tôi
+          </button>
+
+          <p className="text-[11px] text-gray-400">
+            Giáo viên có thể xem lại bài & điều chỉnh Skill Map từ trang admin.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

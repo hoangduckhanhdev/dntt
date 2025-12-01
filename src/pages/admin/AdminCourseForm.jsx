@@ -1,0 +1,210 @@
+import React, { useState, useEffect } from "react";
+import Swal from "sweetalert2";
+import { createCourse, updateCourse, getDropdowns } from "../../api/adminCourseApi";
+
+export default function AdminCourseForm({ course = null, onSaved, onCancel }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [teacher, setTeacher] = useState("");
+  const [price, setPrice] = useState("");
+  const [category, setCategory] = useState("");
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+
+  // Load dropdowns
+  useEffect(() => {
+    async function loadDropdowns() {
+      try {
+        const res = await getDropdowns();
+        setCategories(res.data.categories || []);
+        setTeachers(res.data.teachers || []);
+      } catch (err) {
+        console.error("❌ Lỗi khi tải dropdown:", err);
+        Swal.fire("Lỗi", "Không thể tải danh mục và giảng viên.", "error");
+      }
+    }
+    loadDropdowns();
+  }, []);
+
+  // Load course nếu edit
+  useEffect(() => {
+    if (course) {
+      setTitle(course.title || "");
+      setDescription(course.description || "");
+      setTeacher(course.teacher?._id || course.teacher || "");
+      setPrice(course.price || "");
+      setCategory(course.category?._id || course.category || "");
+      setPreview(course.image || "");
+      setImage(null);
+    } else {
+      setTitle("");
+      setDescription("");
+      setTeacher("");
+      setPrice("");
+      setCategory("");
+      setPreview("");
+      setImage(null);
+    }
+  }, [course]);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    setImage(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setPreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!title || !teacher || !price) {
+      Swal.fire(
+        "⚠️ Thiếu thông tin!",
+        "Vui lòng nhập đầy đủ tiêu đề, giảng viên và giá.",
+        "warning"
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("description", description);
+      formData.append("teacher", teacher);
+      formData.append("price", price);
+      if (category) formData.append("category", category);
+      if (image) formData.append("image", image);
+
+      let res;
+      if (course) {
+        res = await updateCourse(course._id, formData);
+        Swal.fire("✅ Thành công!", "Khóa học đã được cập nhật.", "success");
+      } else {
+        res = await createCourse(formData);
+        Swal.fire("🎉 Thành công!", "Khóa học mới đã được tạo.", "success");
+      }
+
+      // Trả về course mới / cập nhật cho parent
+      onSaved && onSaved(res.data.course || res.data);
+
+    } catch (err) {
+      console.error("❌ Lỗi khi lưu khóa học:", err);
+      Swal.fire(
+        "❌ Lỗi!",
+        err.response?.data?.message || "Không thể lưu khóa học.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white w-full max-w-lg p-6 rounded-xl shadow-lg relative">
+        <button
+          onClick={onCancel}
+          className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+        >
+          ✖
+        </button>
+        <h2 className="text-2xl font-bold mb-6 text-orange-600 text-center">
+          {course ? "✏️ Cập nhật khóa học" : "➕ Thêm khóa học mới"}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block mb-1 text-gray-700">Tiêu đề khóa học *</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full border border-orange-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 text-gray-700">Mô tả</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full border border-orange-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 text-gray-700">Giảng viên *</label>
+            <select
+              value={teacher}
+              onChange={(e) => setTeacher(e.target.value)}
+              className="w-full border border-orange-200 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+            >
+              <option value="">-- Chọn giảng viên --</option>
+              {teachers.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block mb-1 text-gray-700">Giá (VND) *</label>
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="w-full border border-orange-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 text-gray-700">Danh mục</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full border border-orange-200 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+            >
+              <option value="">-- Không chọn danh mục --</option>
+              {categories.map((cat) => (
+                <option key={cat._id} value={cat._id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block mb-1 text-gray-700">Ảnh khóa học</label>
+            <input type="file" accept="image/*" onChange={handleImageChange} />
+            {preview && (
+              <div className="mt-2 flex justify-center">
+                <img
+                  src={preview}
+                  alt="preview"
+                  className="w-32 h-32 object-cover rounded-lg border border-orange-200 shadow-sm"
+                />
+              </div>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-white py-2.5 rounded-lg font-medium shadow-md transition disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {loading ? "⏳ Đang lưu..." : course ? "💾 Cập nhật" : "🚀 Tạo khóa học"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,32 @@
+import React, { createContext, useEffect, useState } from "react";
+
+export const CartContext = createContext({
+  cartCount: 0,
+  updateCount: () => {},
+});
+
+export default function CartProvider({ children }) {
+  const [cartCount, setCartCount] = useState(0);
+
+  const updateCount = () => {
+    try {
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const total = cart.reduce((sum, item) => sum + (item.qty || 1), 0);
+      setCartCount(total);
+    } catch {
+      setCartCount(0);
+    }
+  };
+
+  useEffect(() => {
+    updateCount(); // tính lần đầu khi load
+    window.addEventListener("cartUpdated", updateCount);
+    return () => window.removeEventListener("cartUpdated", updateCount);
+  }, []);
+
+  return (
+    <CartContext.Provider value={{ cartCount, updateCount }}>
+      {children}
+    </CartContext.Provider>
+  );
+}

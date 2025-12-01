@@ -1,0 +1,81 @@
+/* Swiper core (đang dùng) */
+@import "swiper/css";
+@import "swiper/css/pagination";
+
+/* Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Base ===== */
+@layer base {
+  html, body, #root { @apply h-full; }
+  body { @apply bg-gray-50 text-gray-800 antialiased; }
+  a { @apply no-underline text-inherit; }
+  img { @apply select-none; }
+}
+
+/* ===== Layout helpers (giữ nguyên .container cũ + thêm .container-page) ===== */
+@layer components {
+  /* container cũ của bạn – giữ nguyên để không phá bố cục */
+  .container {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* alias container hiện đại dùng dần */
+  .container-page { @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8; }
+
+  .section { @apply container-page py-10 sm:py-12; }
+  .section-title { @apply text-xl sm:text-2xl font-semibold text-dark; }
+  .section-desc { @apply text-sm text-muted; }
+
+  /* ===== Cards ===== */
+  .card { @apply bg-white rounded-2xl border border-border shadow-soft; }
+  .card-pad { @apply p-4 sm:p-5; }
+  .card-hover { @apply transition hover:shadow-lg hover:-translate-y-0.5; }
+
+  /* ===== Buttons (tông cam nhẹ) ===== */
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition shadow-[0_2px_0_0_rgba(0,0,0,0.02)]; }
+  .btn-primary { @apply bg-primary text-white hover:bg-accent; }
+  .btn-ghost   { @apply bg-white text-dark border border-border hover:bg-primaryLight; }
+  .btn-light   { @apply bg-primaryLight text-dark hover:bg-[#ffe8d2]; }
+
+  /* ===== Badges & meta ===== */
+  .badge { @apply inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs bg-primaryLight text-primary; }
+  .meta  { @apply text-xs text-muted; }
+
+  /* ===== Price ===== */
+  .price { @apply text-[17px] font-semibold text-dark; }
+  .price-old { @apply line-through text-muted; }
+
+  /* ===== Nav links ===== */
+  .nav-link { @apply text-sm text-gray-700 hover:text-primary transition; }
+
+  /* ===== Input ===== */
+  .input { @apply w-full rounded-xl border border-border px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-primary focus:border-primary; }
+
+  /* ===== Rating stars (áp cho <svg>) ===== */
+  .star-on  { fill: theme('colors.primary'); }
+  .star-off { fill: #fde7d3; } /* cam nhạt */
+}
+
+/* ===== Utilities khớp với keyframes bạn đã khai báo trong tailwind.config ===== */
+@layer utilities {
+  .fade-in { @apply animate-[fadeIn_0.4s_ease-out]; }
+  .slide-in { @apply animate-[slideIn_0.4s_ease-out]; }
+}
+
+/* ===== Swiper theming theo tông cam ===== */
+.swiper-pagination-bullet {
+  background: theme('colors.primaryLight') !important;
+  opacity: 1 !important;
+  border: 1px solid theme('colors.primary');
+}
+.swiper-pagination-bullet-active {
+  background: theme('colors.primary') !important;
+  border-color: theme('colors.primary') !important;
+}
