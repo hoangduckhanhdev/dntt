@@ -1,13 +1,15 @@
 // src/api/questionApi.js
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_URL } from "./config";
+// API_URL = `${API_BASE}/api`
+// Local  → http://localhost:5000/api
+// Render → https://hkcode.onrender.com/api
 
 const client = axios.create({
-  baseURL: API_BASE,
+  baseURL: API_URL,
 });
 
-// gắn token
+// Gắn token
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -16,9 +18,11 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
-// Các hàm chính để dùng trong form tạo đề thi
+// ===============================
+// CRUD CÂU HỎI (admin)
+// ===============================
+
 const getQuestions = async (params = {}) => {
-  // ví dụ params: { course, chapter, tag, difficulty }
   const res = await client.get("/admin/exam-questions", { params });
   return res.data;
 };
@@ -43,15 +47,13 @@ const deleteQuestion = async (id) => {
   return res.data;
 };
 
+// Export
 const questionApi = {
-  // dùng thẳng: questionApi.getQuestions(...)
   getQuestions,
   getQuestionDetail,
   createQuestion,
   updateQuestion,
   deleteQuestion,
-
-  // alias admin cho dễ mở rộng
   admin: {
     getQuestions,
     getQuestionDetail,

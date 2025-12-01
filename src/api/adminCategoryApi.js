@@ -1,44 +1,48 @@
+// src/api/adminCategoryApi.js
 import axios from "axios";
+import { ADMIN_API_URL } from "./config";
+// ADMIN_API_URL = `${API_BASE}/api/admin`
 
-// ✅ Base URL của backend
-const API_BASE = "http://localhost:5000/api/admin/categories";
+const api = axios.create({
+  baseURL: `${ADMIN_API_URL}/categories`,
+});
 
-// ======================= 🔹 Lấy tất cả danh mục 🔹 =======================
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// ✅ luôn trả về { categories: [...] }
 export const getAllCategories = async () => {
-  try {
-    return await axios.get(`${API_BASE}`);
-  } catch (err) {
-    console.error("Lỗi khi lấy danh mục:", err);
-    throw err;
-  }
+  const res = await api.get("/");
+  const payload = res.data;
+
+  const categories = Array.isArray(payload)
+    ? payload
+    : payload.categories || payload.data || [];
+
+  return { categories };
 };
 
-// ======================= 🔹 Tạo danh mục mới 🔹 =======================
 export const createCategory = async (data) => {
-  try {
-    return await axios.post(`${API_BASE}`, data);
-  } catch (err) {
-    console.error("Lỗi khi tạo danh mục:", err);
-    throw err;
-  }
+  const res = await api.post("/", data);
+  return res.data;
 };
 
-// ======================= 🔹 Cập nhật danh mục 🔹 =======================
 export const updateCategory = async (id, data) => {
-  try {
-    return await axios.put(`${API_BASE}/${id}`, data);
-  } catch (err) {
-    console.error("Lỗi khi cập nhật danh mục:", err);
-    throw err;
-  }
+  const res = await api.put(`/${id}`, data);
+  return res.data;
 };
 
-// ======================= 🔹 Xóa danh mục 🔹 =======================
 export const deleteCategory = async (id) => {
-  try {
-    return await axios.delete(`${API_BASE}/${id}`);
-  } catch (err) {
-    console.error("Lỗi khi xóa danh mục:", err);
-    throw err;
-  }
+  const res = await api.delete(`/${id}`);
+  return res.data;
+};
+
+export default {
+  getAllCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 };

@@ -1,16 +1,15 @@
 // src/api/adminNotificationApi.js
 import axios from "axios";
+import { ADMIN_API_URL } from "./config";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
-
-// 👉 Base URL chính xác: http://localhost:5000/api/admin/notifications
+// 👉 Base URL chính xác: https://hkcode.onrender.com/api/admin/notifications
 const API = axios.create({
-  baseURL: `${API_BASE}/api/admin/notifications`,
+  baseURL: `${ADMIN_API_URL}/notifications`,
 });
 
 // ===================== 🔐 INTERCEPTORS 🔐 ===================== //
 
-// Gắn token
+// Gắn token vào header
 API.interceptors.request.use((config) => {
   try {
     const token = localStorage.getItem("token");
@@ -32,7 +31,10 @@ API.interceptors.response.use(
     const code = data?.code;
     const msg = data?.message || data?.error || "";
 
-    if (status === 401 && (code === "TOKEN_EXPIRED" || msg.includes("jwt expired"))) {
+    if (
+      status === 401 &&
+      (code === "TOKEN_EXPIRED" || (typeof msg === "string" && msg.includes("jwt expired")))
+    ) {
       try {
         localStorage.removeItem("token");
         localStorage.removeItem("userInfo");
@@ -76,7 +78,8 @@ const handleError = (err) => {
 const getAll = async () => {
   try {
     // Lưu ý: tuỳ bạn đang lưu user ở key nào (user hay userInfo)
-    const userRaw = localStorage.getItem("user") || localStorage.getItem("userInfo");
+    const userRaw =
+      localStorage.getItem("user") || localStorage.getItem("userInfo");
     const user = userRaw ? JSON.parse(userRaw) : null;
     const role = user?.role;
 

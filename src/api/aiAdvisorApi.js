@@ -1,12 +1,14 @@
 // src/api/aiAdvisorApi.js
 import axios from "axios";
+import { API_BASE } from "./config"; 
+// API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
 
-const API_BASE = "http://localhost:5000/api";
-
+// 👉 AI Advisor dùng /api/ai
 const aiAdvisorClient = axios.create({
-  baseURL: `${API_BASE}/ai`,
+  baseURL: `${API_BASE}/api/ai`,
 });
 
+// 👉 Tự động gắn token
 aiAdvisorClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -14,30 +16,30 @@ aiAdvisorClient.interceptors.request.use((config) => {
 });
 
 const aiAdvisorApi = {
-  // Entry test → Skill Map AI
+  // ⭐ Entry Test → tạo Skill Map (AI)
   generateSkillMapFromEntryTest: async (payload) => {
     const res = await aiAdvisorClient.post(
       "/skill-map-from-entry-test",
       payload
     );
-    return res.data; // { ok, input, ai: { skillLevels, recommendedPath, suggestedSkills } }
+    return res.data;
   },
 
-  // Exam thường → gợi ý ôn tập & cập nhật profile
+  // ⭐ Exam → phân tích năng lực, gợi ý lộ trình (AI)
   analyzeLearningPathAfterExam: async (payload) => {
     const res = await aiAdvisorClient.post(
       "/learning-path-after-exam",
       payload
     );
-    return res.data; // { ok, input, ai: { weakSkills, shouldReview, recommendations } }
+    return res.data;
   },
 
-  // Lấy profile kỹ năng hiện tại của 1 user trong 1 course
+  // ⭐ Lấy Skill Profile của user
   getUserSkillProfile: async ({ courseId, userId }) => {
     const res = await aiAdvisorClient.get("/user-skill-profile", {
       params: { course: courseId, user: userId },
     });
-    return res.data; // { ok, profiles: [...] }
+    return res.data;
   },
 };
 

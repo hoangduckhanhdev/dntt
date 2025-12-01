@@ -1,8 +1,11 @@
 // src/api/adminProfileApi.js
 import axios from "axios";
+import { ADMIN_API_URL } from "./config";
 
+// 👉 Base URL ví dụ:
+// https://hkcode.onrender.com/api/admin/profile
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+  baseURL: ADMIN_API_URL,
 });
 
 // 🧭 Tự động gắn token Authorization nếu có
@@ -12,6 +15,7 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+// Bắt lỗi chung
 API.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -23,13 +27,13 @@ API.interceptors.response.use(
 const adminProfileApi = {
   // 📄 Lấy hồ sơ
   getProfile: async () => {
-    const res = await API.get("/api/admin/profile");
+    const res = await API.get("/profile");
     return res.data;
   },
 
   // 💾 Cập nhật hồ sơ
   updateProfile: async (data) => {
-    const res = await API.put("/api/admin/profile", data);
+    const res = await API.put("/profile", data);
     return res.data;
   },
 };

@@ -1,10 +1,12 @@
 // src/api/examApi.js
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_URL } from "./config";
+// API_URL = `${API_BASE}/api`
+// → Local:  http://localhost:5000/api
+// → Render: https://hkcode.onrender.com/api
 
 const examClient = axios.create({
-  baseURL: API_BASE,
+  baseURL: API_URL,
 });
 
 examClient.interceptors.request.use((config) => {
@@ -137,9 +139,7 @@ const examApi = {
     },
 
     // 🎓 Gia sư trong bài học (Lesson Tutor)
-    // dùng ở màn hình học bài: gửi đoạn nội dung bài + câu hỏi của học viên
     lessonTutor: async (payload) => {
-      
       const res = await examClient.post(`/ai/lesson-tutor`, payload);
       return res.data; // { ok, answer, suggestions? ... }
     },

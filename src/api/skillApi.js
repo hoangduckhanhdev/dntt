@@ -1,10 +1,12 @@
 // src/api/skillApi.js
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_URL } from "./config";
+// API_URL = `${API_BASE}/api`
+// → Local:  http://localhost:5000/api
+// → Render: https://hkcode.onrender.com/api
 
 const skillClient = axios.create({
-  baseURL: API_BASE,
+  baseURL: API_URL,
 });
 
 skillClient.interceptors.request.use((config) => {
@@ -19,7 +21,8 @@ const skillApi = {
     const res = await skillClient.get("/skills", {
       params: { course: courseId },
     });
-    return res.data; // mong đợi: [{ _id, name, description, parentSkill, level, order }]
+
+    return res.data;
   },
 };
 

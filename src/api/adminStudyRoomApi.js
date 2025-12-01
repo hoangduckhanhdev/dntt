@@ -1,11 +1,10 @@
 // src/api/adminStudyRoomApi.js
 import axios from "axios";
-
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+import { ADMIN_API_URL } from "./config";
 
 // 👉 Gọi đúng endpoint backend: /api/admin/study-rooms
 const api = axios.create({
-  baseURL: `${API_BASE}/api/admin/study-rooms`,
+  baseURL: `${ADMIN_API_URL}/study-rooms`, // ví dụ: https://hkcode.onrender.com/api/admin/study-rooms
 });
 
 // Gắn token JWT
@@ -31,7 +30,10 @@ const handleError = (err) => {
 
   throw {
     status,
-    message: data.message || data.error || "Có lỗi khi gọi API phòng học nhóm",
+    message:
+      data.message ||
+      data.error ||
+      "Có lỗi khi gọi API phòng học nhóm",
   };
 };
 

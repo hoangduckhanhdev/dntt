@@ -1,11 +1,12 @@
+// src/api/courseApi.js
 import axios from "axios";
+import { API_URL, ADMIN_API_URL } from "./config";
 
 /* ============================================================
    INSTANCE ADMIN (/api/admin)
-   – dùng cho quản trị: courses, students, progress
    ============================================================ */
 const ADMIN_API = axios.create({
-  baseURL: "http://localhost:5000/api/admin",
+  baseURL: ADMIN_API_URL, // ví dụ: https://hkcode.onrender.com/api/admin
 });
 
 ADMIN_API.interceptors.request.use((req) => {
@@ -16,10 +17,9 @@ ADMIN_API.interceptors.request.use((req) => {
 
 /* ============================================================
    INSTANCE LEARNING (/api)
-   – dùng cho Q&A, trang học, học viên gửi câu hỏi / giáo viên trả lời
    ============================================================ */
 const LEARNING_API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: API_URL, // ví dụ: https://hkcode.onrender.com/api
 });
 
 LEARNING_API.interceptors.request.use((req) => {
@@ -32,10 +32,14 @@ LEARNING_API.interceptors.request.use((req) => {
    ADMIN – CRUD COURSES
    ============================================================ */
 export const getAllCourses = () => ADMIN_API.get("/courses");
+
 export const createCourse = (data) => ADMIN_API.post("/courses", data);
+
 export const updateCourse = (id, data) =>
   ADMIN_API.put(`/courses/${id}`, data);
+
 export const deleteCourse = (id) => ADMIN_API.delete(`/courses/${id}`);
+
 export const getDropdowns = () => ADMIN_API.get("/courses/dropdowns");
 
 /* ============================================================
@@ -48,13 +52,11 @@ export const getStudentProgress = (courseId, userId) =>
   ADMIN_API.get(`/courses/${courseId}/students/${userId}/progress`);
 
 /* ============================================================
-   Q&A – Dùng chung backend (learningRoutes)
+   Q&A – Learning Side (Học viên – Giáo viên)
    ============================================================ */
-// Lấy danh sách câu hỏi của học viên
 export const getCourseQuestions = (courseId) =>
   LEARNING_API.get(`/courses/${courseId}/questions`);
 
-// Giáo viên/admin trả lời câu hỏi
 export const answerCourseQuestion = (courseId, questionId, data) =>
   LEARNING_API.patch(
     `/courses/${courseId}/questions/${questionId}/answer`,

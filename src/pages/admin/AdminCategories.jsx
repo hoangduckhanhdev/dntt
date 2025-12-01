@@ -10,19 +10,22 @@ export default function AdminCategories() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({ name: "", description: "" });
 
-  // ✅ Lấy danh sách danh mục
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const { data } = await getAllCategories();
-      setCategories(data.categories || data || []);
-    } catch (err) {
-      console.error(err);
-      alert("Không thể tải danh mục!");
-    } finally {
-      setLoading(false);
-    }
-  };
+ // ✅ Lấy danh sách danh mục
+const fetchCategories = async () => {
+  try {
+    setLoading(true);
+
+    // getAllCategories() trả về { categories }
+    const { categories } = await getAllCategories();
+
+    setCategories(categories || []);
+  } catch (err) {
+    console.error("Lỗi load categories:", err);
+    alert("Không thể tải danh mục!");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchCategories();

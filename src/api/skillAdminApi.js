@@ -1,10 +1,12 @@
 // src/api/skillAdminApi.js
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000/api";
+import { ADMIN_API_URL } from "./config";
+// ADMIN_API_URL = `${API_BASE}/api/admin`
+// → Local:  http://localhost:5000/api/admin
+// → Render: https://hkcode.onrender.com/api/admin
 
 const adminSkillClient = axios.create({
-  baseURL: `${API_BASE}/admin`,
+  baseURL: ADMIN_API_URL,
 });
 
 // Thêm token vào request
@@ -17,6 +19,7 @@ adminSkillClient.interceptors.request.use((config) => {
 const skillAdminApi = {
   /* ===========================
      GET SKILLS BY COURSE
+     GET /api/admin/skills?course=...
   ============================= */
   getSkills: async (courseId) => {
     const res = await adminSkillClient.get("/skills", {
@@ -27,6 +30,7 @@ const skillAdminApi = {
 
   /* ===========================
      CREATE
+     POST /api/admin/skills
   ============================= */
   createSkill: async (payload) => {
     const res = await adminSkillClient.post("/skills", payload);
@@ -35,6 +39,7 @@ const skillAdminApi = {
 
   /* ===========================
      UPDATE
+     PUT /api/admin/skills/:id
   ============================= */
   updateSkill: async (id, payload) => {
     const res = await adminSkillClient.put(`/skills/${id}`, payload);
@@ -43,6 +48,7 @@ const skillAdminApi = {
 
   /* ===========================
      DELETE
+     DELETE /api/admin/skills/:id
   ============================= */
   deleteSkill: async (id) => {
     const res = await adminSkillClient.delete(`/skills/${id}`);

@@ -1,13 +1,15 @@
 // src/api/examQuestionApi.js
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_URL } from "./config";
+// API_URL = `${API_BASE}/api`
+// → Local:  http://localhost:5000/api
+// → Render: https://hkcode.onrender.com/api
 
 const client = axios.create({
-  baseURL: API_BASE,
+  baseURL: API_URL,
 });
 
-// Gắn token
+// Gắn token JWT
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -21,7 +23,8 @@ const examQuestionApi = {
       const res = await client.get("/admin/exam-questions", { params });
 
       const data = res.data;
-      // linh hoạt: BE có thể trả {data}, {items} hoặc mảng trực tiếp
+
+      // hỗ trợ nhiều kiểu response từ backend
       const items = Array.isArray(data)
         ? data
         : Array.isArray(data.data)
@@ -36,7 +39,7 @@ const examQuestionApi = {
       };
     },
 
-    // Lấy filters (chương, tags) cho 1 khoá
+    // Lấy filters cho 1 khoá
     getFilters: async (courseId) => {
       const res = await client.get("/admin/exam-questions/filters", {
         params: { course: courseId },
@@ -50,13 +53,13 @@ const examQuestionApi = {
       return res.data;
     },
 
-    // Sửa câu hỏi
+    // Cập nhật
     updateQuestion: async (id, payload) => {
       const res = await client.put(`/admin/exam-questions/${id}`, payload);
       return res.data;
     },
 
-    // Xoá câu hỏi
+    // Xoá
     deleteQuestion: async (id) => {
       const res = await client.delete(`/admin/exam-questions/${id}`);
       return res.data;

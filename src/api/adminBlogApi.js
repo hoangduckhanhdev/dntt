@@ -1,20 +1,30 @@
+// src/api/adminBlogApi.js
 import axios from "axios";
+import { ADMIN_API_URL } from "./config";
 
 const getToken = () => localStorage.getItem("token");
 
+// Tạo instance axios dùng chung
 const api = axios.create({
-  baseURL: "http://localhost:5000/api/admin/blogs",
+  baseURL: `${ADMIN_API_URL}/blogs`, // ví dụ: https://hkcode.onrender.com/api/admin/blogs
   headers: {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${getToken()}`,
   },
 });
 
+// Tự động inject token trước mỗi request
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+/* ============================
+    GET ALL BLOGS
+============================ */
 export const getAllBlogs = async () => {
   try {
-    const res = await api.get("/", {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
+    const res = await api.get("/");
     return res.data;
   } catch (err) {
     console.error("Error getAllBlogs:", err.response || err);
@@ -22,22 +32,31 @@ export const getAllBlogs = async () => {
   }
 };
 
+/* ============================
+      CREATE BLOG
+============================ */
 export const createBlog = async (blogData) => {
   try {
     const formData = new FormData();
 
     formData.append("title", blogData.get("title") || "");
     formData.append("content", blogData.get("content") || "");
-    if (blogData.get("category")) formData.append("category", blogData.get("category"));
-    if (blogData.get("tags")) formData.append("tags", blogData.get("tags"));
-    if (blogData.get("thumbnail")) formData.append("thumbnail", blogData.get("thumbnail"));
+
+    if (blogData.get("category"))
+      formData.append("category", blogData.get("category"));
+
+    if (blogData.get("tags"))
+      formData.append("tags", blogData.get("tags"));
+
+    if (blogData.get("thumbnail"))
+      formData.append("thumbnail", blogData.get("thumbnail"));
 
     const res = await api.post("/", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
-        Authorization: `Bearer ${getToken()}`,
       },
     });
+
     return res.data;
   } catch (err) {
     console.error("Error createBlog:", err.response?.data || err);
@@ -45,13 +64,14 @@ export const createBlog = async (blogData) => {
   }
 };
 
-// Giữ nguyên updateBlog
+/* ============================
+       UPDATE BLOG
+============================ */
 export const updateBlog = async (id, formData) => {
   try {
     const res = await api.put(`/${id}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
-        Authorization: `Bearer ${getToken()}`,
       },
     });
     return res.data;
@@ -61,6 +81,9 @@ export const updateBlog = async (id, formData) => {
   }
 };
 
+/* ============================
+       DELETE BLOG
+============================ */
 export const deleteBlog = async (id) => {
   try {
     const res = await api.delete(`/${id}`);
@@ -71,6 +94,9 @@ export const deleteBlog = async (id) => {
   }
 };
 
+/* ============================
+       SEARCH BLOG
+============================ */
 export const searchBlogs = async (query) => {
   try {
     const res = await api.get(`/search?query=${encodeURIComponent(query)}`);

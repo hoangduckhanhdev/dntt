@@ -1,37 +1,40 @@
 // src/api/adminTeacherApi.js
 import axios from "axios";
+import { ADMIN_API_URL } from "./config"; 
+// ADMIN_API_URL = `${API_BASE}/api/admin`
+// API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
 
-// ✅ Dùng base URL chung cho admin
+// 👉 baseURL chuẩn cho backend admin
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/admin",
-  headers: {
-    Accept: "application/json",
-  },
+  baseURL: `${ADMIN_API_URL}/teachers`, 
+  headers: { Accept: "application/json" },
 });
 
-// ✅ Tự gắn token cho tất cả request
+// 👉 Tự gắn token cho mọi request
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// ✅ Lấy tất cả giáo viên
-export const getAllTeachers = () => API.get("/teachers");
+/* ============================================================
+   TEACHER CRUD
+============================================================ */
 
-// ✅ Tạo giáo viên (FormData)
+// 🔹 Lấy danh sách giáo viên
+export const getAllTeachers = () => API.get("/");
+
+// 🔹 Tạo giáo viên mới (FormData)
 export const createTeacher = (data) =>
-  API.post("/teachers", data, {
+  API.post("/", data, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 
-// ✅ Cập nhật giáo viên (FormData)
+// 🔹 Cập nhật giáo viên
 export const updateTeacher = (id, data) =>
-  API.put(`/teachers/${id}`, data, {
+  API.put(`/${id}`, data, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 
-// ✅ Xóa giáo viên
-export const deleteTeacher = (id) => API.delete(`/teachers/${id}`);
+// 🔹 Xóa giáo viên
+export const deleteTeacher = (id) => API.delete(`/${id}`);
