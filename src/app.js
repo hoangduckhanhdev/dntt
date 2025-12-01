@@ -13,19 +13,31 @@ const app = express();
 
 // ======================= 🔹 CẤU HÌNH CORS 🔹 =======================
 const ALLOWED_ORIGINS = [
-  process.env.FRONTEND_URL || "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
+  process.env.FRONTEND_URL,                    // nếu có set env trên Render
+  "http://localhost:5173",                     // dev local
+  "http://127.0.0.1:5173",                     // dev local
+  "https://hkcode-frontend.onrender.com",      // frontend deploy trên Render
+].filter(Boolean); // loại bỏ undefined/null
 
 const corsOptions = {
-  origin: ALLOWED_ORIGINS,
+  origin: function (origin, callback) {
+    // Cho phép request không có origin (Postman, curl, server-side, healthcheck,…)
+    if (!origin) return callback(null, true);
+
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true); // origin hợp lệ
+    }
+
+    console.log("❌ CORS blocked origin:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // preflight
+app.options("*", cors(corsOptions)); // handle preflight
 
 // ======================= 🔹 MIDDLEWARES 🔹 =======================
 app.use(express.json({ limit: "10mb" }));
