@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import aiAdvisorApi from "../api/aiAdvisorApi";
+import { API_URL } from "../api/config";
 
 export default function StudentSkillReport() {
   const location = useLocation();
@@ -16,16 +17,14 @@ export default function StudentSkillReport() {
   const [loading, setLoading] = useState(!state.aiResult);
   const [error, setError] = useState("");
 
-  // Nếu thiếu dữ liệu thì báo lỗi và hiển thị nút quay lại
+  // ---------- VALIDATION ----------
   useEffect(() => {
     if (!courseId || !exam || !attempt) {
-      setError(
-        "Thiếu dữ liệu bài thi. Vui lòng quay lại trang bài kiểm tra."
-      );
+      setError("Thiếu dữ liệu bài thi. Vui lòng quay lại trang bài kiểm tra.");
     }
   }, [courseId, exam, attempt]);
 
-  // Gọi AI nếu không có sẵn trong state
+  // ---------- FETCH AI ----------
   useEffect(() => {
     const fetchAi = async () => {
       if (!courseId || !exam || !attempt) return;
@@ -36,21 +35,30 @@ export default function StudentSkillReport() {
         setError("");
 
         let res;
+        const userId = attempt.student || attempt.user;
+
+        if (!userId) {
+          setError("Thiếu userId trong attempt.");
+          return;
+        }
+
         if (exam.type === "entry_test") {
           res = await aiAdvisorApi.generateSkillMapFromEntryTest({
             courseId,
-            userId: attempt.student || attempt.user,
+            userId,
             examId: exam._id,
             attemptId: attempt._id,
           });
+
           setAiResult({ mode: "entry_test", payload: res });
         } else {
           res = await aiAdvisorApi.analyzeLearningPathAfterExam({
             courseId,
-            userId: attempt.student || attempt.user,
+            userId,
             examId: exam._id,
             attemptId: attempt._id,
           });
+
           setAiResult({ mode: "exam_analysis", payload: res });
         }
       } catch (err) {
@@ -67,7 +75,7 @@ export default function StudentSkillReport() {
     if (!aiResult) fetchAi();
   }, [aiResult, courseId, exam, attempt]);
 
-  // Nếu không có state thì chặn ngay từ đầu, KHÔNG đụng vào attempt/createdAt nữa
+  // ---------- Nếu thiếu dữ liệu → dừng ngay ----------
   if (!courseId || !exam || !attempt) {
     return (
       <div className="max-w-3xl mx-auto p-6">
@@ -84,7 +92,7 @@ export default function StudentSkillReport() {
     );
   }
 
-  // Từ đây trở xuống chắc chắn đã có attempt, nhưng vẫn nên check field bên trong
+  // ---------- SAFE GET ATTEMPT ----------
   const att = attempt || {};
 
   const canViewScore =
@@ -97,16 +105,17 @@ export default function StudentSkillReport() {
       ? Math.round((att.totalScore / att.maxScore) * 100)
       : 0;
 
-  const createdAtText = att.createdAt
+  const createdAtText = att?.createdAt
     ? new Date(att.createdAt).toLocaleString("vi-VN")
     : "--";
 
-  /** Chuẩn hoá dữ liệu AI */
+  // ---------- Normalize AI ----------
   const normalized = (() => {
     if (!aiResult?.payload) return {};
 
+    const ai = aiResult.payload.ai || {};
+
     if (aiResult.mode === "entry_test") {
-      const ai = aiResult.payload.ai || {};
       return {
         type: "entry_test",
         skillLevels: ai.skillLevels || {},
@@ -117,7 +126,6 @@ export default function StudentSkillReport() {
     }
 
     if (aiResult.mode === "exam_analysis") {
-      const ai = aiResult.payload.ai || {};
       return {
         type: "exam_analysis",
         weakSkills: ai.weakSkills || [],
@@ -130,55 +138,45 @@ export default function StudentSkillReport() {
     return {};
   })();
 
-  /** TEXT MINDMAP */
+  // ---------- MINDMAP TEXT ----------
   const renderMindmap = () => {
     if (!aiResult?.payload) return null;
 
     return (
       <div className="mt-6 bg-violet-50 border border-violet-200 rounded-xl p-4">
         <h2 className="font-semibold text-violet-700 mb-2">
-          🧠 Sơ đồ tư duy kiến thức (AI - dạng chữ)
+          🧠 Sơ đồ tư duy kiến thức (dạng chữ)
         </h2>
-        <p className="text-xs text-gray-600 mb-2">
-          Đây là phiên bản sơ đồ tư duy dạng chữ. Bên dưới là bản sơ đồ tư duy
-          hình ảnh do AI tạo ra.
-        </p>
 
-        {normalized.type === "entry_test" && (
-          <ul className="text-xs text-gray-700 space-y-2">
-            {normalized.path.map((topic, idx) => (
-              <li key={idx}>
-                <span className="font-semibold">
-                  Bước {idx + 1}: {topic}
-                </span>
-                <ul className="list-disc ml-5 mt-1">
-                  <li>Ôn lại lý thuyết liên quan.</li>
-                  <li>Làm bài tập áp dụng.</li>
-                  <li>Ghi chú lỗi sai.</li>
-                </ul>
-              </li>
-            ))}
-          </ul>
-        )}
+        {normalized.type === "entry_test" &&
+          normalized.path.map((topic, idx) => (
+            <div key={idx} className="mb-2 text-xs text-gray-700">
+              <span className="font-semibold">
+                Bước {idx + 1}: {topic}
+              </span>
+              <ul className="list-disc ml-5 mt-1">
+                <li>Ôn lại lý thuyết.</li>
+                <li>Làm bài tập áp dụng.</li>
+                <li>Ghi chú lỗi sai.</li>
+              </ul>
+            </div>
+          ))}
 
-        {normalized.type === "exam_analysis" && (
-          <ul className="text-xs text-gray-700 space-y-2">
-            {normalized.shouldReview.map((topic, idx) => (
-              <li key={idx}>
-                <span className="font-semibold">{topic}</span>
-                <ul className="list-disc ml-5 mt-1">
-                  <li>Xem lại bài giảng.</li>
-                  <li>Làm lại câu sai.</li>
-                  <li>Ghi chú công thức đúng.</li>
-                </ul>
-              </li>
-            ))}
-          </ul>
-        )}
+        {normalized.type === "exam_analysis" &&
+          normalized.shouldReview.map((topic, idx) => (
+            <div key={idx} className="text-xs text-gray-700 mb-2">
+              <span className="font-semibold">{topic}</span>
+              <ul className="list-disc ml-5 mt-1">
+                <li>Xem lại bài giảng.</li>
+                <li>Làm lại câu sai.</li>
+              </ul>
+            </div>
+          ))}
       </div>
     );
   };
 
+  // ---------- RENDER ----------
   return (
     <div className="max-w-4xl mx-auto p-6">
       {/* HEADER */}
@@ -186,13 +184,15 @@ export default function StudentSkillReport() {
         <div>
           <p className="text-xs text-gray-500 mb-1">
             Khoá học:{" "}
-            <span className="font-semibold text-gray-700">
+            <span className="font-semibold">
               {exam?.courseTitle || exam?.course?.title || "—"}
             </span>
           </p>
+
           <h1 className="text-xl font-bold text-slate-800">
             📊 Báo cáo kỹ năng sau bài kiểm tra
           </h1>
+
           <p className="text-xs text-gray-500 mt-1">
             Bài: {exam?.title} – Lần làm: {createdAtText}
           </p>
@@ -206,103 +206,95 @@ export default function StudentSkillReport() {
         </button>
       </div>
 
-      {/* MAIN BOX */}
+      {/* MAIN */}
       <div className="bg-white rounded-xl border shadow-soft p-5">
         {/* SCORE */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <div>
-            {canViewScore ? (
-              <>
-                <p className="text-sm text-slate-600 mb-1">
-                  Kết quả tổng quan của bạn:
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-extrabold text-orange-600">
-                    {att.totalScore}
-                  </span>
-                  <span className="text-slate-500">
-                    / {att.maxScore} ({percent}%)
-                  </span>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-slate-600">
-                Điểm sẽ được cập nhật sau.
-              </p>
-            )}
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          {canViewScore ? (
+            <div>
+              <p className="text-sm text-slate-600">Kết quả tổng quan:</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-orange-600">
+                  {att.totalScore}
+                </span>
+                <span className="text-slate-500">
+                  / {att.maxScore} ({percent}%)
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600">Điểm sẽ được cập nhật.</p>
+          )}
 
           <div className="text-xs text-gray-500">
-            Tổng số câu:{" "}
-            <span className="font-semibold">{att.answers?.length || 0}</span>
+            Tổng số câu: {att.answers?.length || 0}
           </div>
         </div>
 
-        {/* AI SUMMARY */}
+        {/* SUMMARY */}
         <h2 className="font-semibold text-slate-800 mb-2">
           🎯 Nhận xét chung của AI
         </h2>
 
         {loading && <p className="text-xs text-gray-500">Đang phân tích…</p>}
         {error && (
-          <p className="text-xs text-red-600 mb-2">
-            Không lấy được dữ liệu AI: {error}
-          </p>
+          <p className="text-xs text-red-600 mb-2">{error}</p>
         )}
 
         {!loading && aiResult && normalized.summary && (
-          <p className="text-sm text-gray-700 mb-3">{normalized.summary}</p>
+          <p className="text-sm text-gray-700 mb-3">
+            {normalized.summary}
+          </p>
         )}
 
-        {/* AI DETAILS */}
-        {!loading && aiResult && normalized.type === "exam_analysis" && (
-          <>
-            {normalized.weakSkills.length > 0 && (
-              <div className="mb-2">
-                <p className="text-xs font-semibold text-gray-700 mb-1">
-                  Kỹ năng còn yếu:
-                </p>
-                <p className="text-xs text-gray-700">
-                  {normalized.weakSkills.join(", ")}
-                </p>
-              </div>
-            )}
+        {/* DETAILS */}
+        {!loading &&
+          aiResult &&
+          normalized.type === "exam_analysis" && (
+            <>
+              {normalized.weakSkills.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-xs font-semibold text-gray-700 mb-1">
+                    Kỹ năng còn yếu:
+                  </p>
+                  <p className="text-xs text-gray-700">
+                    {normalized.weakSkills.join(", ")}
+                  </p>
+                </div>
+              )}
 
-            {normalized.recommendations.length > 0 && (
-              <div className="mb-2">
-                <p className="text-xs font-semibold text-gray-700 mb-1">
-                  Gợi ý cụ thể:
-                </p>
-                <ul className="text-xs text-gray-700 list-disc pl-5 space-y-1">
-                  {normalized.recommendations.map((r, idx) => (
-                    <li key={idx}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
-        )}
+              {normalized.recommendations.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-xs font-semibold text-gray-700 mb-1">
+                    Gợi ý cụ thể:
+                  </p>
+                  <ul className="list-disc pl-5 text-xs space-y-1">
+                    {normalized.recommendations.map((r, idx) => (
+                      <li key={idx}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
 
         {/* TEXT MINDMAP */}
         {renderMindmap()}
 
-        {/* IMAGE MINDMAP (AI) */}
+        {/* IMAGE MINDMAP */}
         <div className="mt-6">
           <h2 className="font-semibold text-violet-700 mb-2">
-            🧩 Sơ đồ tư duy (AI tạo hình ảnh)
+            🧩 Sơ đồ tư duy (AI hình ảnh)
           </h2>
 
           <img
-            src={`${import.meta.env.VITE_API_URL}/api/learning/mindmap-image/${
-              attempt._id
-            }`}
+            src={`${API_URL}/learning/mindmap-image/${attempt._id}`}
             alt="AI Mindmap"
             className="w-full rounded-xl border shadow bg-white object-contain max-h-[600px]"
           />
         </div>
 
-        {/* FOOTER */}
-        <div className="mt-6 flex justify-between items-center">
+        <div className="mt-6 flex justify-between">
           <button
             onClick={() => navigate("/my-courses")}
             className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600"
@@ -310,9 +302,9 @@ export default function StudentSkillReport() {
             Về khoá học của tôi
           </button>
 
-          <p className="text-[11px] text-gray-400">
-            Giáo viên có thể xem lại bài & điều chỉnh Skill Map từ trang admin.
-          </p>
+          <span className="text-[11px] text-gray-400">
+            Giáo viên có thể chỉnh sửa Skill Map từ Admin.
+          </span>
         </div>
       </div>
     </div>

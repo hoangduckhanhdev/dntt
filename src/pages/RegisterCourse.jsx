@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useParams, useLocation } from "react-router-dom";
+import axios from "axios";
 
-import api from "../api/authApi";
+import { API_URL } from "../api/config";
 import { createPayment } from "../api/ordersApi";
+
 export default function RegisterCourse() {
-  // 🔎 lấy courseId từ nhiều nguồn
-  const { id: routeCourseId } = useParams(); // /registercourse/:id
+  const { id: routeCourseId } = useParams();
   const location = useLocation();
   const query = new URLSearchParams(location.search);
-  const queryCourseId = query.get("courseId"); // /registercourse?courseId=...
-  const stateCourseId = location.state?.courseId; // Link(..., { state: { courseId } })
+  const queryCourseId = query.get("courseId");
+  const stateCourseId = location.state?.courseId;
 
   const [courses, setCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+
   const [form, setForm] = useState({
     studentName: "",
     email: "",
@@ -22,38 +24,26 @@ export default function RegisterCourse() {
     courseId: "",
   });
 
-  // 🧠 map id -> course; lấy course đang chọn + giá
-  const courseMap = useMemo(() => {
-    const m = new Map();
-    courses.forEach((c) => m.set(c._id, c));
-    return m;
-  }, [courses]);
-
-  const selectedCourse = form.courseId ? courseMap.get(form.courseId) : null;
-  const selectedPrice = selectedCourse?.price ?? 0;
-
-  /* ===================== FETCH DATA + PREFILL ===================== */
+  /* ===================== LOAD COURSES ===================== */
   useEffect(() => {
     let alive = true;
+
     (async () => {
       try {
-        // ❌ bỏ hard-code URL, dùng api chung
-        const res = await api.get("/courses");
+        const res = await axios.get(`${API_URL}/courses`);
         if (alive) setCourses(res.data || []);
       } catch (err) {
-        // err đã được normalize từ interceptor
-        console.error("❌ Lỗi khi lấy danh sách khóa học:", err);
-        alert(`Không tải được danh sách khóa học (${err.status || "?"}).`);
+        console.error("❌ Không tải được danh sách khóa học:", err);
+        alert("Không tải được danh sách khóa học!");
       } finally {
         if (alive) setCoursesLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+
+    return () => (alive = false);
   }, []);
 
-  // 👤 auto-fill tên + email nếu có user trong localStorage
+  /* ===================== PREFILL USER ===================== */
   useEffect(() => {
     try {
       const u = JSON.parse(localStorage.getItem("user") || "null");
@@ -67,31 +57,49 @@ export default function RegisterCourse() {
     } catch {}
   }, []);
 
-  // 🎯 chọn courseId ưu tiên: /:id -> ?courseId -> state -> item đầu tiên
+  /* ===================== AUTO-SELECT COURSE ===================== */
   useEffect(() => {
     if (!courses.length) return;
-    const preferred = routeCourseId || queryCourseId || stateCourseId || courses[0]?._id;
+
+    const preferred =
+      routeCourseId || queryCourseId || stateCourseId || courses[0]?._id;
+
     const exists = courses.some((c) => c._id === preferred);
+
     setForm((prev) => ({
       ...prev,
       courseId: exists ? preferred : courses[0]?._id || "",
     }));
   }, [courses, routeCourseId, queryCourseId, stateCourseId]);
 
-  /* ===================== HANDLERS ===================== */
+  /* ===================== MAP COURSE INFO ===================== */
+  const courseMap = useMemo(() => {
+    const m = new Map();
+    courses.forEach((c) => m.set(c._id, c));
+    return m;
+  }, [courses]);
+
+  const selectedCourse = form.courseId ? courseMap.get(form.courseId) : null;
+  const selectedPrice = selectedCourse?.price ?? 0;
+
+  /* ===================== FORM CHANGE ===================== */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // 🚀 Submit: KHÔNG gửi amount; backend tự lấy giá theo courseId
+  /* ===================== SUBMIT ===================== */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.courseId || !form.studentName || !form.email || !form.phone) return;
+
+    if (!form.studentName || !form.email || !form.phone || !form.courseId) {
+      alert("Vui lòng nhập đầy đủ thông tin!");
+      return;
+    }
 
     setLoading(true);
+
     try {
-      // Gọi qua API chuẩn hoá → tự đính kèm Bearer token nếu có
       const data = await createPayment({
         studentName: form.studentName,
         email: form.email,
@@ -99,21 +107,13 @@ export default function RegisterCourse() {
         courseId: form.courseId,
       });
 
-      // backend có thể trả { data: { checkoutUrl } } hoặc { checkoutUrl }
       const checkoutUrl = data?.data?.checkoutUrl || data?.checkoutUrl;
-      if (!checkoutUrl) throw new Error("Server không trả về checkoutUrl.");
+      if (!checkoutUrl) throw new Error("Server không trả về checkoutUrl");
 
-      window.location.href = checkoutUrl; // → PayOS
+      window.location.href = checkoutUrl;
     } catch (err) {
-      // err đã được normalize: { status, message, url, method, data }
-      console.error("Payment failed:", err);
-      const msg =
-        err?.message ||
-        err?.data?.message ||
-        (err.status === 401
-          ? "Bạn chưa đăng nhập hoặc phiên hết hạn. Vui lòng đăng nhập lại."
-          : "Lỗi khi tạo đơn thanh toán. Vui lòng thử lại!");
-      alert(`❌ ${msg}`);
+      console.error("❌ Lỗi thanh toán:", err);
+      alert(err?.message || "Không thể tạo đơn thanh toán");
     } finally {
       setLoading(false);
     }
@@ -122,7 +122,7 @@ export default function RegisterCourse() {
   /* ===================== UI ===================== */
   return (
     <div className="flex flex-col md:flex-row h-screen">
-      {/* Bên trái: hình + mô tả */}
+      {/* Left panel */}
       <div className="md:w-1/2 bg-gradient-to-br from-orange-500 via-orange-400 to-orange-300 text-white flex flex-col justify-between p-10">
         <div>
           <h2 className="text-4xl font-extrabold mb-4 drop-shadow-md">
@@ -144,13 +144,14 @@ export default function RegisterCourse() {
         />
       </div>
 
-      {/* Bên phải: form đăng ký */}
+      {/* Right panel */}
       <div className="md:w-1/2 bg-white p-10 flex flex-col justify-center shadow-inner">
         <h2 className="text-3xl font-bold text-center text-orange-600 mb-6">
           Đăng ký khóa học
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-5 max-w-md mx-auto w-full">
+          {/* Name */}
           <div>
             <label className="block font-medium text-gray-700 mb-1">Họ và tên</label>
             <input
@@ -164,6 +165,7 @@ export default function RegisterCourse() {
             />
           </div>
 
+          {/* Email */}
           <div>
             <label className="block font-medium text-gray-700 mb-1">Email</label>
             <input
@@ -177,6 +179,7 @@ export default function RegisterCourse() {
             />
           </div>
 
+          {/* Phone */}
           <div>
             <label className="block font-medium text-gray-700 mb-1">Số điện thoại</label>
             <input
@@ -192,15 +195,17 @@ export default function RegisterCourse() {
             />
           </div>
 
+          {/* Course */}
           <div>
             <label className="block font-medium text-gray-700 mb-1">Khóa học</label>
+
             <select
               name="courseId"
               value={form.courseId}
               onChange={handleChange}
-              className="border border-gray-300 rounded-lg p-3 w-full focus:ring-2 focus:ring-orange-400 outline-none bg-white"
+              className="border border-gray-300 rounded-lg p-3 w-full bg-white focus:ring-2 focus:ring-orange-400 outline-none"
+              disabled={coursesLoading}
               required
-              disabled={coursesLoading || !courses.length}
             >
               {coursesLoading ? (
                 <option>Đang tải khóa học…</option>
@@ -216,24 +221,23 @@ export default function RegisterCourse() {
             </select>
 
             {selectedCourse && (
-              <div className="mt-2 text-sm text-gray-600">
+              <p className="mt-2 text-sm text-gray-600">
                 Giá:{" "}
                 <b className="text-orange-600">
                   {Number(selectedPrice).toLocaleString("vi-VN")} ₫
                 </b>
-              </div>
+              </p>
             )}
           </div>
 
+          {/* Submit */}
           <motion.button
             type="submit"
             disabled={loading || coursesLoading || !form.courseId}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.98 }}
             className={`bg-gradient-to-r from-orange-500 to-orange-400 text-white w-full py-3 rounded-xl font-semibold shadow-md hover:opacity-90 transition ${
-              loading || coursesLoading || !form.courseId
-                ? "opacity-60 cursor-not-allowed"
-                : ""
+              loading || coursesLoading ? "opacity-60 cursor-not-allowed" : ""
             }`}
           >
             {loading ? "Đang tạo đơn..." : "💳 Đăng ký & Thanh toán ngay"}
@@ -241,8 +245,7 @@ export default function RegisterCourse() {
         </form>
 
         <p className="text-center text-gray-500 mt-6 text-sm">
-          Sau khi thanh toán, bạn sẽ được chuyển về trang kết quả. Nếu PayOS mất vài giây để xác nhận,
-          hệ thống sẽ tự kiểm tra & cập nhật trạng thái.
+          Sau khi thanh toán, hệ thống sẽ tự động cập nhật trạng thái đơn hàng.
         </p>
       </div>
     </div>

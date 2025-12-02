@@ -3,8 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import examApi from "../api/examApi";
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000/api";
+import { ADMIN_API_URL } from "../api/config"; // ✅ dùng config chung
 
 export default function ExamFormCreate() {
   const navigate = useNavigate();
@@ -31,7 +30,7 @@ export default function ExamFormCreate() {
     const fetchCourses = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get(`${API_BASE}/admin/courses`, {
+        const res = await axios.get(`${ADMIN_API_URL}/courses`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           params: { page: 1, limit: 1000 },
         });
@@ -57,7 +56,7 @@ export default function ExamFormCreate() {
       try {
         const token = localStorage.getItem("token");
         const res = await axios.get(
-          `${API_BASE}/admin/courses/${form.course}/classes`,
+          `${ADMIN_API_URL}/courses/${form.course}/classes`,
           {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           }
@@ -130,7 +129,10 @@ export default function ExamFormCreate() {
         assignedClasses: form.assignedClasses,
         accessMode: "class_only",
 
-        timeLimit: form.type === "assignment" ? null : Number(form.timeLimit || 0),
+        timeLimit:
+          form.type === "assignment"
+            ? null
+            : Number(form.timeLimit || 0),
         attemptsAllowed: Number(form.attemptsAllowed || 1),
 
         shuffleQuestions: !!form.shuffleQuestions,
@@ -211,7 +213,9 @@ export default function ExamFormCreate() {
             {classes.map((cl) => (
               <option key={cl._id} value={cl._id}>
                 {cl.name} {cl.code ? `- ${cl.code}` : ""}{" "}
-                {cl.semester || cl.year ? `(${cl.semester || ""} ${cl.year || ""})` : ""}
+                {cl.semester || cl.year
+                  ? `(${cl.semester || ""} ${cl.year || ""})`
+                  : ""}
               </option>
             ))}
           </select>

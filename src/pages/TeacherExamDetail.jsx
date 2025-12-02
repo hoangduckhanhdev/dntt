@@ -4,8 +4,7 @@ import { useParams } from "react-router-dom";
 
 import examApi from "../api/examApi";
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_URL } from "../api/config"; // ✅ Dùng config chung, không còn localhost
 
 export default function TeacherExamDetail() {
   const { id } = useParams(); // examId
@@ -121,7 +120,7 @@ export default function TeacherExamDetail() {
       const token = localStorage.getItem("token");
 
       const res = await axios.post(
-        `${API_BASE}/ai/grade-essay`,
+        `${API_URL}/ai/grade-essay`, // ✅ Dùng API_URL, không hard-code localhost
         {
           question: q.content,
           studentAnswer,

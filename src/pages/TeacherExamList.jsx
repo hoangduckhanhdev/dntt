@@ -27,6 +27,7 @@ export default function TeacherExamList() {
 
   const handleTogglePublish = async (exam) => {
     const next = !exam.isPublished;
+
     if (
       !window.confirm(
         next
@@ -38,7 +39,7 @@ export default function TeacherExamList() {
 
     try {
       setActionLoadingId(exam._id);
-      await examApi.admin.publishExam(exam._id, next); // PUT /api/admin/exams/:id/publish
+      await examApi.admin.publishExam(exam._id, next);
       await load();
     } catch (err) {
       console.error(err);
@@ -58,7 +59,7 @@ export default function TeacherExamList() {
 
     try {
       setActionLoadingId(exam._id);
-      await examApi.admin.deleteExam(exam._id); // DELETE /api/admin/exams/:id
+      await examApi.admin.deleteExam(exam._id);
       await load();
     } catch (err) {
       console.error(err);
@@ -74,6 +75,7 @@ export default function TeacherExamList() {
         <h1 className="text-2xl font-bold text-dark">
           📘 Danh sách đề thi / bài kiểm tra
         </h1>
+
         <Link
           to="/teacher/exams/create"
           className="px-4 py-2 bg-primary text-white rounded-xl shadow-soft hover:bg-accent transition"
@@ -97,6 +99,7 @@ export default function TeacherExamList() {
                 <th className="py-3 px-4 text-right">Hành động</th>
               </tr>
             </thead>
+
             <tbody>
               {exams.map((ex) => (
                 <tr key={ex._id} className="border-t border-border">
@@ -105,11 +108,13 @@ export default function TeacherExamList() {
                     {ex.course?.title || "—"}
                   </td>
                   <td className="py-3 px-4 capitalize">{ex.type}</td>
+
                   <td className="py-3 px-4">
                     {ex.selectionMode === "auto"
                       ? "Tự động từ ngân hàng"
                       : "Chọn thủ công"}
                   </td>
+
                   <td className="py-3 px-4">
                     {ex.isPublished ? (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
@@ -121,6 +126,7 @@ export default function TeacherExamList() {
                       </span>
                     )}
                   </td>
+
                   <td className="py-3 px-4 text-right space-x-2">
                     <Link
                       to={`/teacher/exams/${ex._id}`}
@@ -149,6 +155,7 @@ export default function TeacherExamList() {
                   </td>
                 </tr>
               ))}
+
               {exams.length === 0 && (
                 <tr>
                   <td

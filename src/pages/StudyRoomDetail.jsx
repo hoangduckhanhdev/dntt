@@ -15,25 +15,31 @@ export default function StudyRoomDetail() {
   const typingTimeoutRef = useRef(null);
   const socketRef = useRef(null);
 
-  // Lấy user hiện tại từ localStorage
+  // ==== LẤY USER HIỆN TẠI TỪ LOCALSTORAGE AN TOÀN ====
   const currentUser = (() => {
     try {
       const raw = localStorage.getItem("user");
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch {
       return null;
     }
   })();
-  const currentUserId = currentUser?._id || currentUser?.id;
 
-  // Scroll xuống cuối khi có tin nhắn mới
+  const currentUserId =
+    currentUser?._id ||
+    currentUser?.id ||
+    currentUser?.userId ||
+    null; // fallback an toàn
+
+  // ==== AUTO SCROLL ====
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // Load messages + setup socket
+  // ==== LOAD TIN NHẮN + SOCKET.IO ====
   useEffect(() => {
     if (!roomId) return;
 
@@ -42,23 +48,29 @@ export default function StudyRoomDetail() {
     const socket = getSocket();
     socketRef.current = socket;
 
-    // join phòng chat
+    // 👉 Join room
     socket.emit("join_study_room", {
       roomId,
-      userId: currentUserId,
+      userId: currentUserId || "guest",
     });
 
-    // lắng nghe tin nhắn mới
+    // 📩 Nhận tin nhắn mới
     const handleNewMsg = (msg) => {
+      if (!msg) return;
+
       const msgRoomId =
         typeof msg.room === "string" ? msg.room : msg.room?._id;
 
       if (msgRoomId !== roomId) return;
+
       setMessages((prev) => [...prev, msg]);
     };
 
+    // ✏ Người khác đang nhập
     const handleTyping = ({ roomId: rId, userId, isTyping }) => {
-      if (rId !== roomId || userId === currentUserId) return;
+      if (rId !== roomId) return;
+      if (userId === currentUserId) return; // bỏ qua chính mình
+
       setTypingUsers((prev) => ({
         ...prev,
         [userId]: isTyping,
@@ -71,21 +83,21 @@ export default function StudyRoomDetail() {
     return () => {
       socket.emit("leave_study_room", {
         roomId,
-        userId: currentUserId,
+        userId: currentUserId || "guest",
       });
 
       socket.off("study_room_message_new", handleNewMsg);
       socket.off("study_room_typing", handleTyping);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, currentUserId]);
 
+  // ==== API LẤY LỊCH SỬ ====
   async function fetchMessages() {
     try {
       setLoading(true);
       setErr("");
       const data = await studyRoomApi.getRoomMessages(roomId);
-      setMessages(data || []);
+      setMessages(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
       setErr("Không tải được lịch sử chat.");
@@ -94,12 +106,13 @@ export default function StudyRoomDetail() {
     }
   }
 
+  // ==== XỬ LÝ GÕ PHÍM ====
   function handleChangeInput(e) {
     const value = e.target.value;
     setInput(value);
 
     const socket = socketRef.current;
-    if (!socket) return;
+    if (!socket || !currentUserId) return;
 
     socket.emit("study_room_typing", {
       roomId,
@@ -107,6 +120,7 @@ export default function StudyRoomDetail() {
       isTyping: true,
     });
 
+    // Delay typing
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
@@ -119,46 +133,38 @@ export default function StudyRoomDetail() {
     }, 1500);
   }
 
+  // ==== GỬI TIN NHẮN ====
   function handleSubmit(e) {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const content = input.trim();
     const socket = socketRef.current;
-    if (!socket) return;
+    if (!socket || !currentUserId) return;
 
-    // gửi qua socket
     socket.emit("study_room_message", {
       roomId,
       userId: currentUserId,
-      content,
+      content: input.trim(),
       type: "text",
     });
 
-    // chỉ clear input, chờ server emit "study_room_message_new"
     setInput("");
   }
 
   const typingSomeone =
     Object.values(typingUsers).filter(Boolean).length > 0;
 
-  // 👉 Hàm gọi thoại nhóm bằng Jitsi Meet
+  // ==== GỌI THOẠI NHÓM (JITSI) ====
   const handleGroupCall = () => {
-    if (!roomId) {
-      alert("Không tìm thấy ID phòng học nhóm.");
-      return;
-    }
+    if (!roomId) return alert("Không tìm thấy ID phòng học nhóm.");
 
-    // Đặt tên phòng Jitsi duy nhất cho từng StudyRoom
     const roomName = `elearning-room-${roomId}`;
-    const url = `https://meet.jit.si/${roomName}`;
-
-    // Mở phòng gọi trong tab mới
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(`https://meet.jit.si/${roomName}`, "_blank");
   };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 h-[calc(100vh-80px)] flex flex-col">
+      {/* HEADER */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <Link
@@ -169,11 +175,10 @@ export default function StudyRoomDetail() {
           </Link>
           <h1 className="text-xl font-bold mt-1">Phòng học nhóm</h1>
           <p className="text-xs text-gray-500">
-            Chat realtime giữa học viên và giáo viên trong lớp.
+            Chat realtime giữa học viên và giáo viên.
           </p>
         </div>
 
-        {/* Nút gọi thoại nhóm */}
         <button
           type="button"
           className="px-3 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700"
@@ -183,29 +188,34 @@ export default function StudyRoomDetail() {
         </button>
       </div>
 
+      {/* ERROR */}
       {err && (
         <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
           {err}
         </div>
       )}
 
+      {/* CHAT BOX */}
       <div className="flex-1 border rounded-lg flex flex-col bg-white overflow-hidden">
         <div className="flex-1 overflow-y-auto px-3 py-2">
           {loading ? (
             <p>Đang tải tin nhắn...</p>
           ) : messages.length === 0 ? (
             <p className="text-sm text-gray-500">
-              Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện đầu tiên nhé.
+              Chưa có tin nhắn nào.
             </p>
           ) : (
             messages.map((msg) => {
+              const sender =
+                msg.sender || {}; // phòng null sender
               const senderId =
-                msg.sender?._id || msg.sender?.id || msg.sender;
+                sender._id || sender.id || sender.userId || sender;
+
               const isMe = senderId === currentUserId;
 
               return (
                 <div
-                  key={msg._id}
+                  key={msg._id || Math.random()}
                   className={`mb-2 flex ${
                     isMe ? "justify-end" : "justify-start"
                   }`}
@@ -217,18 +227,21 @@ export default function StudyRoomDetail() {
                         : "bg-gray-100 text-gray-900"
                     }`}
                   >
-                    {!isMe && msg.sender?.name && (
+                    {!isMe && sender?.name && (
                       <div className="text-xs font-semibold mb-0.5 opacity-80">
-                        {msg.sender.name}
+                        {sender.name}
                       </div>
                     )}
+
                     <div>{msg.content}</div>
+
                     <div className="text-[10px] opacity-60 mt-1 text-right">
-                      {msg.createdAt &&
-                        new Date(msg.createdAt).toLocaleTimeString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      {msg.createdAt
+                        ? new Date(msg.createdAt).toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : ""}
                     </div>
                   </div>
                 </div>
@@ -238,12 +251,14 @@ export default function StudyRoomDetail() {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* TYPING */}
         {typingSomeone && (
           <div className="px-3 pb-1 text-xs text-gray-500">
             Ai đó đang nhập...
           </div>
         )}
 
+        {/* INPUT BOX */}
         <form
           onSubmit={handleSubmit}
           className="border-t px-3 py-2 flex items-center space-x-2"
@@ -251,7 +266,7 @@ export default function StudyRoomDetail() {
           <input
             value={input}
             onChange={handleChangeInput}
-            className="flex-1 border rounded-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 border rounded-full px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500"
             placeholder="Nhập tin nhắn..."
           />
           <button

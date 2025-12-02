@@ -20,11 +20,6 @@ export default function Courses() {
         setLoading(true);
 
         const [courseRes, categoryRes] = await Promise.all([
-          // ❌ KHÔNG dùng localhost nữa
-          // axios.get("http://localhost:5000/api/courses"),
-          // axios.get("http://localhost:5000/api/category"),
-
-          // ✅ Dùng API_URL đã config (Render sẽ tự dùng https://hkcode.onrender.com)
           axios.get(`${API_URL}/courses`),
           axios.get(`${API_URL}/category`),
         ]);

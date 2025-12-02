@@ -1,6 +1,8 @@
+// src/pages/Teachers.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../api/config"; // ⬅️ DÙNG CHUNG CONFIG
 
 export default function Teachers() {
   const [teachers, setTeachers] = useState([]);
@@ -11,7 +13,7 @@ export default function Teachers() {
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/teacher");
+        const res = await axios.get(`${API_URL}/teacher`);
         setTeachers(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Lỗi khi lấy danh sách giảng viên:", err);
@@ -53,6 +55,7 @@ export default function Teachers() {
   return (
     <div className="bg-orange-50/70">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
         {/* Header */}
         <div className="text-center mb-8">
           <p className="inline-flex items-center px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-xs font-semibold mb-3">
@@ -62,12 +65,11 @@ export default function Teachers() {
             Danh sách giảng viên
           </h1>
           <p className="text-slate-500 text-sm sm:text-base max-w-xl mx-auto">
-            Những người đồng hành cùng bạn trong hành trình học tập – bạn có thể
-            tìm theo tên hoặc chuyên môn.
+            Tìm theo tên hoặc chuyên môn để chọn giảng viên phù hợp.
           </p>
         </div>
 
-        {/* Thanh tìm kiếm + tổng số */}
+        {/* Tìm kiếm */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-8">
           <div className="flex-1 flex items-center gap-2 bg-white rounded-xl border border-orange-100 px-3 py-2 shadow-sm">
             <span className="text-orange-400 text-lg">🔍</span>
@@ -109,9 +111,6 @@ export default function Teachers() {
                   ? teacher.rating.toFixed(1)
                   : "0.0";
 
-              const expertise =
-                teacher.expertise || "Chưa cập nhật chuyên môn";
-
               return (
                 <button
                   key={teacher._id}
@@ -129,7 +128,7 @@ export default function Teachers() {
                     </span>
                   </div>
 
-                  {/* Avatar + tên */}
+                  {/* Avatar */}
                   <div className="flex flex-col items-center text-center mb-4">
                     <div className="relative mb-3">
                       <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-orange-200 to-amber-200 blur opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -137,13 +136,14 @@ export default function Teachers() {
                         src={avatar}
                         alt={teacher.name}
                         className="relative w-24 h-24 rounded-full object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform duration-200"
-                        loading="lazy"
                       />
                     </div>
                     <h2 className="text-base sm:text-lg font-semibold text-slate-800">
                       {teacher.name}
                     </h2>
-                    <p className="text-xs text-slate-500 mt-1">{expertise}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {teacher.expertise || "Chưa cập nhật chuyên môn"}
+                    </p>
                   </div>
 
                   {/* Info dưới */}

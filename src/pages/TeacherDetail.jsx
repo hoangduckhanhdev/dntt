@@ -1,20 +1,37 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API_URL } from "../api/config"; // ✅ Dùng config chung
 
 export default function TeacherDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     const fetchTeacher = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/teacher/${id}`);
-        setTeacher(res.data);
+        setErr("");
+
+        // ✅ API URL dùng từ config — chạy trên điện thoại OK
+        const res = await axios.get(`${API_URL}/teacher/${id}`);
+
+        const data =
+          res.data?.teacher && typeof res.data.teacher === "object"
+            ? res.data.teacher
+            : res.data;
+
+        if (!data || typeof data !== "object") {
+          setErr("Không tìm thấy thông tin giảng viên.");
+        } else {
+          setTeacher(data);
+        }
       } catch (err) {
         console.error("Lỗi khi lấy thông tin giảng viên:", err);
+        setErr("Không thể tải dữ liệu giảng viên.");
       } finally {
         setLoading(false);
       }
@@ -23,10 +40,24 @@ export default function TeacherDetail() {
     fetchTeacher();
   }, [id]);
 
-  if (loading || !teacher) {
+  if (loading) {
     return (
       <div className="bg-orange-50/70 min-h-[60vh] flex items-center justify-center">
         <p className="text-gray-500">Đang tải thông tin giảng viên...</p>
+      </div>
+    );
+  }
+
+  if (err || !teacher) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center">
+        <p className="text-red-500 mb-3">{err}</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 bg-orange-500 text-white rounded-lg"
+        >
+          ← Quay lại
+        </button>
       </div>
     );
   }
@@ -57,7 +88,7 @@ export default function TeacherDetail() {
         {/* KHUNG TỔNG */}
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-orange-100">
 
-          {/* ================= HEADER ================ */}
+          {/* HEADER */}
           <div className="relative bg-gradient-to-r from-orange-400 to-amber-300 p-10 text-white text-center">
 
             {/* Avatar */}
@@ -67,14 +98,16 @@ export default function TeacherDetail() {
                 <img
                   src={avatar}
                   alt={teacher.name}
+                  onError={(e) =>
+                    (e.target.src =
+                      "https://cdn-icons-png.flaticon.com/512/3135/3135715.png")
+                  }
                   className="w-40 h-40 rounded-full border-4 border-white shadow-xl object-cover relative"
                 />
               </div>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-bold">
-              {teacher.name}
-            </h1>
+            <h1 className="text-3xl sm:text-4xl font-bold">{teacher.name}</h1>
 
             <p className="text-white/90 text-lg mt-1">
               {teacher.title || "Giảng viên HKCode"}
@@ -100,7 +133,7 @@ export default function TeacherDetail() {
             </div>
           </div>
 
-          {/* ================= BODY ================ */}
+          {/* BODY */}
           <div className="p-10 space-y-10">
 
             {/* Giới thiệu */}
@@ -139,6 +172,7 @@ export default function TeacherDetail() {
               </section>
             )}
 
+            {/* Thành tựu */}
             {teacher.achievements?.length > 0 && (
               <section>
                 <h2 className="text-xl font-semibold text-orange-600 mb-3">
@@ -146,27 +180,10 @@ export default function TeacherDetail() {
                 </h2>
                 <ul className="text-gray-700 text-sm sm:text-base divide-y divide-orange-50 border border-orange-100 rounded-xl overflow-hidden">
                   {teacher.achievements.map((a, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-2 px-4 py-3 bg-orange-50/30"
-                    >
+                    <li key={i} className="flex items-start gap-2 px-4 py-3 bg-orange-50/30">
                       <span className="mt-1 text-orange-500">✔</span>
                       <span>{a}</span>
                     </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {/* Khóa học */}
-            {teacher.coursesTaught?.length > 0 && (
-              <section className="border-l-4 border-orange-400 pl-5">
-                <h2 className="text-xl font-semibold text-orange-600 mb-2">
-                  📚 Các khóa học đang giảng dạy
-                </h2>
-                <ul className="list-disc pl-6 text-gray-700 space-y-2">
-                  {teacher.coursesTaught.map((c, i) => (
-                    <li key={i}>{c}</li>
                   ))}
                 </ul>
               </section>

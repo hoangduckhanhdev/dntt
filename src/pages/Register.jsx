@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../api/authApi";
-import Swal from "sweetalert2"; // ✅ thêm thông báo popup đẹp
+import Swal from "sweetalert2";
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
@@ -21,7 +21,7 @@ export default function Register() {
     setError("");
 
     if (form.password !== form.confirmPassword) {
-      setError("Mật khẩu không khớp");
+      setError("Mật khẩu không khớp nhau!");
       return;
     }
 
@@ -33,20 +33,17 @@ export default function Register() {
         password: form.password,
       });
 
-      if (res.data.success) {
-        // ✅ Hiển thị popup thông báo
-        await Swal.fire({
-          icon: "success",
-          title: "Đăng ký thành công!",
-          text: "Vui lòng đăng nhập để tiếp tục.",
-          confirmButtonColor: "#f97316",
-        });
+      await Swal.fire({
+        icon: "success",
+        title: "Đăng ký thành công!",
+        text: "Hãy đăng nhập để tiếp tục nhé 🎉",
+        confirmButtonColor: "#f97316",
+      });
 
-        // ✅ Điều hướng sang trang đăng nhập
-        navigate("/login");
-      }
+      navigate("/login");
     } catch (err) {
-      setError(err.response?.data?.message || "Đăng ký thất bại");
+      const msg = err?.response?.data?.message || "Đăng ký thất bại, thử lại sau!";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -67,34 +64,40 @@ export default function Register() {
         )}
 
         <form onSubmit={handleRegister} className="space-y-5">
+          {/* NAME */}
           <div>
             <label className="block text-gray-700 mb-1 text-sm">Họ và tên</label>
             <input
               type="text"
               placeholder="Nguyễn Văn A"
+              value={form.name}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none"
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
             />
           </div>
 
+          {/* EMAIL */}
           <div>
             <label className="block text-gray-700 mb-1 text-sm">Email</label>
             <input
               type="email"
               placeholder="example@gmail.com"
+              value={form.email}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none"
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               required
             />
           </div>
 
+          {/* PASSWORD */}
           <div>
             <label className="block text-gray-700 mb-1 text-sm">Mật khẩu</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
+                value={form.password}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none pr-10"
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required
@@ -109,23 +112,30 @@ export default function Register() {
             </div>
           </div>
 
+          {/* CONFIRM PASSWORD */}
           <div>
-            <label className="block text-gray-700 mb-1 text-sm">Xác nhận mật khẩu</label>
+            <label className="block text-gray-700 mb-1 text-sm">
+              Xác nhận mật khẩu
+            </label>
             <input
               type="password"
               placeholder="••••••••"
+              value={form.confirmPassword}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none"
-              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, confirmPassword: e.target.value })
+              }
               required
             />
           </div>
 
+          {/* SUBMIT */}
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-gradient-to-r from-orange-500 to-orange-400 text-white py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-orange-500 transition-all"
           >
-            {loading ? "Đang xử lý..." : "Đăng ký"}
+            {loading ? "Đang tạo tài khoản..." : "Đăng ký"}
           </button>
         </form>
 

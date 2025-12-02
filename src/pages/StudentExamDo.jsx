@@ -4,8 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import examApi from "../api/examApi";
 import aiAdvisorApi from "../api/aiAdvisorApi";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_URL } from "../api/config"; // ✅ dùng config chung
 
 export default function StudentExamDo() {
   const { id } = useParams(); // examId
@@ -61,6 +60,7 @@ export default function StudentExamDo() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   // ===========================================================
@@ -85,10 +85,17 @@ export default function StudentExamDo() {
       setPhase("doing");
     } catch (err) {
       console.error(err);
-      window.alert(
-        err?.response?.data?.message || "Không thể bắt đầu / tiếp tục bài thi"
-      );
-      navigate(-1);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không thể bắt đầu / tiếp tục bài thi";
+      window.alert(msg);
+
+      if (err?.response?.status === 401) {
+        navigate(`/login?redirect=/exams/${id}/do`, { replace: true });
+      } else {
+        navigate(-1);
+      }
     }
   };
 
@@ -213,11 +220,12 @@ export default function StudentExamDo() {
       formData.append("examId", id);
       formData.append("questionId", q._id);
 
-      const res = await axios.post(`${API_BASE}/uploads/exam`, formData, {
+      const res = await axios.post(`${API_URL}/uploads/exam`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        withCredentials: true,
       });
 
       const url = res.data?.url || res.data?.fileUrl;
@@ -229,7 +237,13 @@ export default function StudentExamDo() {
       updateAnswer(q._id, { fileUrl: url });
     } catch (err) {
       console.error("Upload file thất bại:", err?.response?.data || err);
-      window.alert("Upload file thất bại, bạn thử lại nhé.");
+
+      if (err?.response?.status === 401) {
+        window.alert("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
+        navigate(`/login?redirect=/exams/${id}/do`, { replace: true });
+      } else {
+        window.alert("Upload file thất bại, bạn thử lại nhé.");
+      }
     }
   };
 
@@ -254,9 +268,7 @@ export default function StudentExamDo() {
 
       // ====== Tính số câu đúng & điểm thang 10 cho popup ======
       if (!exam || exam.showScoreToStudent === false || !Array.isArray(att?.answers)) {
-        setResultPopup({
-          type: "simple",
-        });
+        setResultPopup({ type: "simple" });
       } else {
         const totalQuestions = att.answers.length;
 
@@ -296,8 +308,8 @@ export default function StudentExamDo() {
           return;
         }
 
-        // Bài TEST ĐẦU VÀO
         if (exam.type === "entry_test") {
+          // Bài TEST ĐẦU VÀO
           const aiRes = await aiAdvisorApi.generateSkillMapFromEntryTest({
             courseId,
             userId,
@@ -338,9 +350,7 @@ export default function StudentExamDo() {
     if (remainingSeconds == null) return "Không giới hạn";
     const m = Math.floor(remainingSeconds / 60);
     const s = remainingSeconds % 60;
-    return `${m.toString().padStart(2, "0")}:${s
-      .toString()
-      .padStart(2, "0")}`;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
   const renderDueTime = () => {
@@ -593,7 +603,6 @@ export default function StudentExamDo() {
                   Bạn đã nộp bài thành công. Dưới đây là kết quả:
                 </p>
 
-                {/* Hiển thị số câu đúng + điểm thang 10 */}
                 <div className="mb-2">
                   <div className="text-4xl font-extrabold text-orange-600">
                     {correctQuestions}/{totalQuestions}
@@ -766,7 +775,7 @@ export default function StudentExamDo() {
             const q = ans.question;
             const type = q.type;
             const selectedIds = (ans.selectedOptionIds || []).map(String);
-            let optionSnapshots = ans.optionSnapshots || q.options || [];
+            const optionSnapshots = ans.optionSnapshots || q.options || [];
 
             return (
               <div key={q._id} className="p-4 border rounded-lg bg-orange-50">

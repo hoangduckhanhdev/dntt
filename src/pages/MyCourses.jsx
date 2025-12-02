@@ -2,8 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE, API_URL } from "../api/config";
 
 /* ===== Đoán ảnh khoá học một cách “thông minh” ===== */
 const resolveCourseImage = (courseWrapper) => {
@@ -37,7 +36,9 @@ const resolveCourseImage = (courseWrapper) => {
       allStrings.find((s) =>
         /\.(png|jpe?g|webp|gif|svg)$/i.test(s.split("?")[0])
       ) ||
-      allStrings.find((s) => s.includes("/uploads/") || s.includes("images/"));
+      allStrings.find(
+        (s) => s.includes("/uploads/") || s.includes("images/")
+      );
   }
 
   // 3. Nếu là path tương đối -> ghép với API_BASE
@@ -66,7 +67,7 @@ const MyCourses = () => {
           return;
         }
 
-        const res = await axios.get(`${API_BASE}/api/my-courses`, {
+        const res = await axios.get(`${API_URL}/my-courses`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -74,9 +75,13 @@ const MyCourses = () => {
 
         setCourses(res.data.courses || []);
       } catch (err) {
-        console.error("GET /api/my-courses error:", err?.response?.data || err);
+        console.error(
+          "GET /my-courses error:",
+          err?.response?.data || err
+        );
         setError(
-          err.response?.data?.message || "Không lấy được danh sách khoá học"
+          err?.response?.data?.message ||
+            "Không lấy được danh sách khoá học"
         );
       } finally {
         setLoading(false);

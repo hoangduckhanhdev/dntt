@@ -1,3 +1,4 @@
+// src/pages/ProfilePage.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +17,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../api/config"; // ⬅ Sửa: dùng API chuẩn
 
 const ProfilePage = () => {
   const [user, setUser] = useState({});
@@ -24,19 +26,25 @@ const ProfilePage = () => {
   const [coverFile, setCoverFile] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [message, setMessage] = useState("");
+
   const navigate = useNavigate();
 
   const token = localStorage.getItem("token");
+
   const axiosAuth = axios.create({
-    baseURL: "http://localhost:5000/api",
+    baseURL: API_URL,
     headers: { Authorization: `Bearer ${token}` },
+    withCredentials: true,
   });
 
-  // 🟢 Lấy thông tin hồ sơ
+  // ======================= LOAD PROFILE ==========================
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const { data } = await axiosAuth.get("/users/profile");
+        const res = await axiosAuth.get("/users/profile");
+
+        const data = res?.data?.user || res?.data || {};
+
         setUser(data);
         setForm(data);
       } catch (err) {
@@ -46,13 +54,26 @@ const ProfilePage = () => {
     fetchProfile();
   }, []);
 
-  // 🟢 Cập nhật state khi thay đổi input
+  // ======================= HANDLE INPUT ==========================
   const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
 
-  // 🟢 Lưu thay đổi
+  // ======================= FORMAT IMG URL =========================
+  const resolveImg = (src, fallback) => {
+    if (!src) return fallback;
+
+    if (src.startsWith("http")) return src;
+
+    return `${API_URL.replace("/api", "")}/${src.startsWith("/") ? src.slice(1) : src}`;
+  };
+
+  // ======================= SAVE PROFILE ==========================
   const handleSave = async (e) => {
     e.preventDefault();
+
     const formData = new FormData();
 
     Object.keys(form).forEach((key) => {
@@ -65,11 +86,16 @@ const ProfilePage = () => {
     if (coverFile) formData.append("cover", coverFile);
 
     try {
-      const { data } = await axiosAuth.put("/users/profile", formData, {
+      const res = await axiosAuth.put("/users/profile", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setUser(data.user);
+
+      const updated = res?.data?.user || res.data;
+
+      setUser(updated);
+      setForm(updated);
       setEditMode(false);
+
       setMessage("🎉 Hồ sơ đã được cập nhật!");
       setTimeout(() => setMessage(""), 3000);
     } catch (err) {
@@ -85,20 +111,17 @@ const ProfilePage = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-5xl bg-white shadow-2xl rounded-3xl overflow-hidden relative"
       >
-        {/* Ảnh bìa */}
+        {/* ====================== COVER ============================ */}
         <div className="relative">
           <img
             src={
               coverFile
                 ? URL.createObjectURL(coverFile)
-                : user.cover && user.cover.startsWith("http")
-                ? user.cover
-                : "https://res.cloudinary.com/demo/image/upload/v1686120453/sample.jpg"
+                : resolveImg(
+                    user.cover,
+                    "https://res.cloudinary.com/demo/image/upload/v1686120453/sample.jpg"
+                  )
             }
-            onError={(e) => {
-              e.target.src =
-                "https://res.cloudinary.com/demo/image/upload/v1686120453/sample.jpg";
-            }}
             className="h-64 w-full object-cover"
             alt="cover"
           />
@@ -115,44 +138,41 @@ const ProfilePage = () => {
             </label>
           )}
 
-          {/* Avatar */}
+          {/* ====================== AVATAR =========================== */}
           <div className="absolute -bottom-20 left-16 flex items-center gap-6">
             <div className="relative">
               <img
                 src={
                   avatarFile
                     ? URL.createObjectURL(avatarFile)
-                    : user.avatar && user.avatar.startsWith("http")
-                    ? user.avatar
-                    : "https://via.placeholder.com/150"
+                    : resolveImg(user.avatar, "https://via.placeholder.com/150")
                 }
-                onError={(e) => {
-                  e.target.src = "https://via.placeholder.com/150";
-                }}
                 className="w-40 h-40 rounded-full border-4 border-white shadow-xl object-cover"
                 alt="avatar"
               />
+
               {editMode && (
                 <label className="absolute bottom-2 right-2 bg-orange-500 p-2 rounded-full cursor-pointer">
                   <Upload size={18} color="white" />
                   <input
                     type="file"
-                    className="hidden"
                     accept="image/*"
+                    className="hidden"
                     onChange={(e) => setAvatarFile(e.target.files[0])}
                   />
                 </label>
               )}
             </div>
+
             <div>
               <h1 className="text-3xl font-bold text-gray-800">
                 {editMode ? (
                   <input
                     type="text"
                     name="name"
+                    className="border-b border-gray-300 focus:border-orange-500 outline-none"
                     value={form.name || ""}
                     onChange={handleChange}
-                    className="border-b border-gray-300 focus:border-orange-500 outline-none"
                   />
                 ) : (
                   user.name || "Người dùng"
@@ -165,7 +185,7 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* Nội dung */}
+        {/* ======================= BODY ============================ */}
         <div className="pt-28 px-10 pb-10">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-3xl font-semibold text-gray-800 flex items-center gap-2">
@@ -194,19 +214,11 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* Giới thiệu */}
+          {/* ======================= INFO FIELDS ======================= */}
           <AnimatePresence mode="wait">
-            <motion.div
-              key="intro"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               {editMode ? (
-                <form
-                  onSubmit={handleSave}
-                  className="grid md:grid-cols-2 gap-6"
-                >
+                <form className="grid md:grid-cols-2 gap-6" onSubmit={handleSave}>
                   {[
                     { name: "phone", label: "Số điện thoại", icon: Phone },
                     { name: "address", label: "Địa chỉ", icon: MapPin },
@@ -214,9 +226,9 @@ const ProfilePage = () => {
                     { name: "bio", label: "Giới thiệu", icon: Info },
                     { name: "skills", label: "Kỹ năng", icon: Brain },
                   ].map(({ name, label, icon: Icon }) => (
-                    <div key={name} className="flex flex-col gap-2">
-                      <label className="font-medium flex items-center gap-2 text-gray-700">
-                        <Icon size={18} className="text-orange-500" /> {label}
+                    <div className="flex flex-col gap-2" key={name}>
+                      <label className="font-medium flex items-center gap-2">
+                        <Icon className="text-orange-500" size={18} /> {label}
                       </label>
                       <input
                         type="text"
@@ -227,6 +239,7 @@ const ProfilePage = () => {
                       />
                     </div>
                   ))}
+
                   <div className="col-span-2 flex justify-end mt-6">
                     <button
                       type="submit"
@@ -262,12 +275,11 @@ const ProfilePage = () => {
           </AnimatePresence>
         </div>
 
-        {/* Thông báo */}
+        {/* ======================= MESSAGE ============================ */}
         {message && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
             className="fixed bottom-6 right-6 bg-white border-l-4 border-orange-500 shadow-lg px-5 py-3 rounded-lg flex items-center gap-3"
           >
             <CheckCircle className="text-orange-500" /> {message}

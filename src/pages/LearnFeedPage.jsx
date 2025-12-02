@@ -4,8 +4,7 @@ import axios from "axios";
 import { FiActivity, FiInfo } from "react-icons/fi";
 import FeedComposer from "../components/feed/FeedComposer";
 import FeedPostCard from "../components/feed/FeedPostCard";
-
-const API_BASE = "http://localhost:5000/api";
+import { API_BASE_URL } from "../api/config"; // ⬅️ dùng URL chung
 
 // 🔐 Helper: axios config có kèm token
 const getAuthConfig = () => {
@@ -33,31 +32,40 @@ export default function LearnFeedPage() {
   const [hasMore, setHasMore] = useState(true);
   const [user, setUser] = useState(null);
 
+  // Load user từ localStorage
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("user");
+      const stored =
+        localStorage.getItem("user") ||
+        localStorage.getItem("userInfo") ||
+        localStorage.getItem("userData");
+
       if (stored) setUser(JSON.parse(stored));
     } catch {}
   }, []);
 
+  // ============================
+  //      LOAD FEED
+  // ============================
   const loadFeed = async ({ reset = false } = {}) => {
     try {
       setLoading(true);
       const currentPage = reset ? 1 : page;
 
       const res = await axios.get(
-        `${API_BASE}/feed?page=${currentPage}&limit=10`,
+        `${API_BASE_URL}/feed?page=${currentPage}&limit=10`,
         getAuthConfig()
       );
 
       const data = res.data || [];
+
       if (reset) {
         setPosts(data);
       } else {
         setPosts((prev) => [...prev, ...data]);
       }
 
-      setHasMore(data.length === 10);
+      setHasMore(data.length === 10); // còn trang sau không
       setPage(currentPage + 1);
     } catch (err) {
       console.error("loadFeed error:", err);
@@ -72,6 +80,7 @@ export default function LearnFeedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reload sau khi đăng bài
   const handleReload = () => {
     setPage(1);
     loadFeed({ reset: true });
@@ -183,7 +192,7 @@ export default function LearnFeedPage() {
 
             <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-4">
               <h2 className="text-sm font-semibold text-slate-900 mb-2">
-                Gợi ý 
+                Gợi ý
               </h2>
               <p className="text-xs text-slate-600 leading-relaxed">
                 LearnFeed như một tính năng signature, giúp

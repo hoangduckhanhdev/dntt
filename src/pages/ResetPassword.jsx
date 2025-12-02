@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import axios from "axios";
+import { API_URL } from "../api/config"; // ✅ dùng config chung
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -10,12 +11,25 @@ export default function ResetPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!password.trim()) {
+      Swal.fire("Lỗi!", "Mật khẩu không được để trống", "error");
+      return;
+    }
+
     try {
-      await axios.post(`http://localhost:5000/api/auth/reset-password/${token}`, { password });
+      await axios.post(`${API_URL}/auth/reset-password/${token}`, {
+        password,
+      });
+
       Swal.fire("Thành công!", "Mật khẩu của bạn đã được thay đổi", "success");
       navigate("/login");
     } catch (err) {
-      Swal.fire("Lỗi!", err.response?.data?.message || "Token không hợp lệ", "error");
+      Swal.fire(
+        "Lỗi!",
+        err?.response?.data?.message || "Token không hợp lệ hoặc đã hết hạn",
+        "error"
+      );
     }
   };
 
