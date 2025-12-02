@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import BlogCard from "../components/BlogCard";
+import { API_URL } from "../api/config"; // ✅ dùng config chung
 
 export default function BlogList() {
   const [blogs, setBlogs] = useState([]);
@@ -12,6 +13,7 @@ export default function BlogList() {
 
   useEffect(() => {
     fetchBlogs(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
   const fetchBlogs = async (pageNum) => {
@@ -19,7 +21,8 @@ export default function BlogList() {
     setError(null);
 
     try {
-      const res = await axios.get("http://localhost:5000/api/blogs", {
+      // ❌ Cũ: "http://localhost:5000/api/blogs"
+      const res = await axios.get(`${API_URL}/blogs`, {
         params: { page: pageNum, limit },
       });
 
@@ -45,7 +48,7 @@ export default function BlogList() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 bg-gradient-to-b from-pink-50 via-purple-50 to-indigo-50 min-h-screen">
       <h1 className="text-4xl font-extrabold mb-12 text-center text-purple-700 drop-shadow-sm">
-        📰 Tin tức & Blog học tập
+        📰 Tin tức &amp; Blog học tập
       </h1>
 
       {error && (
@@ -60,7 +63,6 @@ export default function BlogList() {
         </div>
       ) : blogs.length > 0 ? (
         <>
-
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {blogs.map((blog) => (
               <BlogCard key={blog._id} blog={blog} />

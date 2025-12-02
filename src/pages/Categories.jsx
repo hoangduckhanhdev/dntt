@@ -8,6 +8,8 @@ import { Autoplay } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/autoplay";
 
+import { API_URL } from "../api/config";
+
 export default function Categories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +18,7 @@ export default function Categories() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/category");
+        const res = await axios.get(`${API_URL}/category`);
         setCategories(res.data);
       } catch (err) {
         console.error("Lỗi khi lấy danh mục:", err);
@@ -58,7 +60,10 @@ export default function Categories() {
                   className="relative cursor-pointer overflow-hidden rounded-2xl shadow-lg group"
                 >
                   <img
-                    src={c.image || "https://source.unsplash.com/400x300/?education,learning"}
+                    src={
+                      c.image ||
+                      "https://source.unsplash.com/400x300/?education,learning"
+                    }
                     alt={c.name}
                     className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-500"
                   />

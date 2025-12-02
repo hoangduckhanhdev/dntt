@@ -1,24 +1,40 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import * as Icons from "lucide-react"; 
+import * as Icons from "lucide-react";
+import { API_URL, API_BASE } from "../api/config"; // ✅ dùng config chung
+
+// Helper convert đường dẫn tương đối -> URL đầy đủ
+const toMediaUrl = (src) => {
+  if (!src) return null;
+  if (src.startsWith("http")) return src;
+  // bỏ / ở đầu nếu có rồi nối với API_BASE
+  return `${API_BASE}/${src.replace(/^\/+/, "")}`;
+};
 
 export default function About() {
   const [about, setAbout] = useState(null);
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/about")
+      // ❌ Cũ: .get("http://localhost:5000/api/about")
+      .get(`${API_URL}/about`) // ✅ Gọi qua API_URL
       .then((res) => setAbout(res.data))
       .catch((err) => console.error("Lỗi tải dữ liệu:", err));
   }, []);
 
   if (!about) return <div className="text-center py-10">Đang tải...</div>;
 
+  const mainImage = toMediaUrl(about.image);
+  const galleryImages = Array.isArray(about.gallery)
+    ? about.gallery.map(toMediaUrl)
+    : [];
+  const exploreBg = about.explore ? toMediaUrl(about.explore.background) : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white">
-     
-      {about.image && (
+      {/* Ảnh hero + title */}
+      {mainImage && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -26,7 +42,7 @@ export default function About() {
           className="relative w-full max-w-6xl mx-auto rounded-2xl overflow-hidden shadow-lg mt-8"
         >
           <img
-            src={about.image}
+            src={mainImage}
             alt="Giới thiệu LearnCode"
             className="w-full h-[400px] object-cover"
           />
@@ -38,8 +54,8 @@ export default function About() {
         </motion.div>
       )}
 
-
       <div className="max-w-6xl mx-auto px-6 py-12 text-center">
+        {/* Nội dung chính */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -49,12 +65,15 @@ export default function About() {
           {about.content}
         </motion.p>
 
+        {/* Sứ mệnh / Tầm nhìn */}
         <div className="grid md:grid-cols-2 gap-8 mb-12">
           <motion.div
             whileHover={{ scale: 1.03 }}
             className="p-6 bg-white rounded-2xl shadow-md border border-purple-100"
           >
-            <h2 className="text-2xl font-semibold text-purple-600 mb-3">🎯 Sứ mệnh</h2>
+            <h2 className="text-2xl font-semibold text-purple-600 mb-3">
+              🎯 Sứ mệnh
+            </h2>
             <p className="text-gray-600">{about.mission}</p>
           </motion.div>
 
@@ -62,11 +81,14 @@ export default function About() {
             whileHover={{ scale: 1.03 }}
             className="p-6 bg-white rounded-2xl shadow-md border border-purple-100"
           >
-            <h2 className="text-2xl font-semibold text-purple-600 mb-3">🌟 Tầm nhìn</h2>
+            <h2 className="text-2xl font-semibold text-purple-600 mb-3">
+              🌟 Tầm nhìn
+            </h2>
             <p className="text-gray-600">{about.vision}</p>
           </motion.div>
         </div>
 
+        {/* Giá trị cốt lõi */}
         {about.values && (
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -74,11 +96,14 @@ export default function About() {
             transition={{ duration: 0.8 }}
             className="bg-purple-50 p-8 rounded-2xl mb-12 shadow-sm"
           >
-            <h2 className="text-2xl font-bold text-purple-700 mb-4">💎 Giá trị cốt lõi</h2>
+            <h2 className="text-2xl font-bold text-purple-700 mb-4">
+              💎 Giá trị cốt lõi
+            </h2>
             <p className="text-gray-700">{about.values}</p>
           </motion.div>
         )}
 
+        {/* Tính năng nổi bật */}
         {about.features && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -86,7 +111,9 @@ export default function About() {
             transition={{ duration: 1 }}
             className="mb-16"
           >
-            <h2 className="text-2xl font-bold text-purple-700 mb-8">🚀 Tính năng nổi bật</h2>
+            <h2 className="text-2xl font-bold text-purple-700 mb-8">
+              🚀 Tính năng nổi bật
+            </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
               {about.features.map((item, index) => {
                 const IconComponent = Icons[item.icon] || Icons.Star;
@@ -105,16 +132,19 @@ export default function About() {
           </motion.div>
         )}
 
-        {about.gallery && (
+        {/* Gallery */}
+        {galleryImages.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             transition={{ duration: 0.8 }}
             className="mb-16"
           >
-            <h2 className="text-2xl font-bold text-purple-700 mb-6">📸 Khoảnh khắc LearnCode</h2>
+            <h2 className="text-2xl font-bold text-purple-700 mb-6">
+              📸 Khoảnh khắc LearnCode
+            </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {about.gallery.map((img, idx) => (
+              {galleryImages.map((img, idx) => (
                 <motion.img
                   key={idx}
                   src={img}
@@ -127,6 +157,7 @@ export default function About() {
           </motion.div>
         )}
 
+        {/* Video */}
         {about.video && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -149,6 +180,8 @@ export default function About() {
             </div>
           </motion.div>
         )}
+
+        {/* Explore section */}
         {about.explore && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
@@ -156,9 +189,9 @@ export default function About() {
             transition={{ duration: 0.8 }}
             className="relative text-center py-20 rounded-2xl mt-16 overflow-hidden shadow-xl"
           >
-            {about.explore.background && (
+            {exploreBg && (
               <img
-                src={about.explore.background}
+                src={exploreBg}
                 alt="Explore background"
                 className="absolute inset-0 w-full h-full object-cover opacity-30"
               />
@@ -168,11 +201,15 @@ export default function About() {
               <h2 className="text-3xl md:text-4xl font-bold text-purple-700 mb-4">
                 {about.explore.title}
               </h2>
-              <p className="text-gray-700 text-lg mb-8">{about.explore.subtitle}</p>
+              <p className="text-gray-700 text-lg mb-8">
+                {about.explore.subtitle}
+              </p>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => (window.location.href = about.explore.buttonLink)}
+                onClick={() =>
+                  (window.location.href = about.explore.buttonLink)
+                }
                 className="px-8 py-3 bg-purple-600 text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition-colors duration-300"
               >
                 {about.explore.buttonText}
@@ -180,8 +217,6 @@ export default function About() {
             </div>
           </motion.div>
         )}
-
-
       </div>
     </div>
   );

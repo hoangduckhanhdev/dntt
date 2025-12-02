@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
+import { API_URL, API_BASE } from "../api/config"; // ✅ dùng config chung
 
 export default function BlogDetail() {
   const { slug } = useParams();
@@ -13,7 +14,8 @@ export default function BlogDetail() {
       setLoading(true);
       setError(null);
       try {
-        const res = await axios.get(`http://localhost:5000/api/blogs/${slug}`);
+        // ❌ Cũ: http://localhost:5000/api/blogs/${slug}
+        const res = await axios.get(`${API_URL}/blogs/${slug}`); // ✅
         setBlog(res.data.blog);
       } catch (err) {
         console.error("❌ Lỗi khi lấy chi tiết blog:", err);
@@ -46,9 +48,16 @@ export default function BlogDetail() {
       </div>
     );
 
+  // Tạo URL ảnh chuẩn từ backend Render
+  const thumbnailUrl =
+    blog.thumbnail && blog.thumbnail.startsWith("http")
+      ? blog.thumbnail
+      : blog.thumbnail
+      ? `${API_BASE}/uploads/${blog.thumbnail}` // ✅ dùng API_BASE
+      : null;
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-12 bg-gradient-to-b from-pink-50 via-purple-50 to-indigo-50 rounded-2xl shadow-lg">
-      
       <Link
         to="/blog"
         className="inline-block mb-6 text-indigo-600 font-bold hover:text-pink-600 hover:underline transition-colors duration-300"
@@ -56,7 +65,6 @@ export default function BlogDetail() {
         ← Quay lại danh sách
       </Link>
 
-      
       <h1 className="text-4xl md:text-5xl font-extrabold mb-4 text-purple-700 text-center drop-shadow-sm">
         {blog.title}
       </h1>
@@ -66,17 +74,14 @@ export default function BlogDetail() {
         {blog.author || "Tác giả ẩn danh"}
       </p>
 
-      {blog.thumbnail && (
+      {thumbnailUrl && (
         <img
-          src={
-            blog.thumbnail.startsWith("http")
-              ? blog.thumbnail
-              : `http://localhost:5000/uploads/${blog.thumbnail}`
-          }
+          src={thumbnailUrl}
           alt={blog.title}
           onError={(e) => {
             e.target.onerror = null;
-            e.target.src = "https://via.placeholder.com/800x400?text=No+Image";
+            e.target.src =
+              "https://placehold.co/800x400?text=No+Image"; // ✅ tránh via.placeholder.com lỗi DNS
           }}
           className="w-full h-96 md:h-[500px] object-cover rounded-2xl mb-8 shadow-lg hover:scale-[1.02] transition-transform duration-500"
         />

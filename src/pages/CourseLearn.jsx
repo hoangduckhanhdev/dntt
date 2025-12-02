@@ -14,7 +14,7 @@ import {
 } from "react-icons/fi";
 import { FaUsers } from "react-icons/fa";
 
-const API_BASE = "http://localhost:5000";
+import { API_URL, API_BASE } from "../api/config";
 
 /* =========================
    Helpers

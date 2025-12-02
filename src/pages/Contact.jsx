@@ -2,23 +2,38 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { Mail, Phone, MapPin, Globe, Facebook, Linkedin } from "lucide-react";
+import { API_URL, API_BASE } from "../api/config";
+
+// Helper: chuẩn hóa URL ảnh / background
+const toMediaUrl = (src) => {
+  if (!src) return null;
+  if (src.startsWith("http")) return src;
+  return `${API_BASE}/${src.replace(/^\/+/, "")}`;
+};
 
 export default function Contact() {
   const [contact, setContact] = useState(null);
 
   useEffect(() => {
-    axios.get("http://localhost:5000/api/contact")
-      .then(res => setContact(res.data))
-      .catch(err => console.error("❌ Lỗi tải dữ liệu liên hệ:", err));
+    axios
+      // ❌ Cũ: "http://localhost:5000/api/contact"
+      .get(`${API_URL}/contact`) // ✅ Gọi qua API_URL
+      .then((res) => setContact(res.data))
+      .catch((err) => console.error("❌ Lỗi tải dữ liệu liên hệ:", err));
   }, []);
 
-  if (!contact) return <div className="text-center py-20 text-gray-500">Đang tải...</div>;
+  if (!contact)
+    return (
+      <div className="text-center py-20 text-gray-500">Đang tải...</div>
+    );
+
+  const bgUrl = toMediaUrl(contact.background);
 
   return (
     <div
       className="min-h-screen bg-gradient-to-b from-indigo-50 to-white py-12"
       style={{
-        backgroundImage: contact.background ? `url(${contact.background})` : "none",
+        backgroundImage: bgUrl ? `url(${bgUrl})` : "none",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
@@ -28,8 +43,11 @@ export default function Contact() {
         <h1 className="text-4xl md:text-5xl font-bold text-indigo-700 mb-4 whitespace-pre-line">
           {contact.title}
         </h1>
-        <p className="text-gray-700 mb-12 text-lg">{contact.description}</p>
+        <p className="text-gray-700 mb-12 text-lg">
+          {contact.description}
+        </p>
 
+        {/* 3 ô Email / Hotline / Địa chỉ */}
         <div className="grid md:grid-cols-3 gap-8 mb-12">
           <motion.div
             whileHover={{ scale: 1.05 }}
@@ -59,13 +77,15 @@ export default function Contact() {
           </motion.div>
         </div>
 
+        {/* Mạng xã hội */}
         {contact.socials && contact.socials.length > 0 && (
           <div className="flex justify-center gap-6 mb-12">
             {contact.socials.map((item, index) => {
+              const iconName = (item.icon || "").toLowerCase();
               const Icon =
-                item.icon.toLowerCase() === "facebook"
+                iconName === "facebook"
                   ? Facebook
-                  : item.icon.toLowerCase() === "linkedin"
+                  : iconName === "linkedin"
                   ? Linkedin
                   : Globe;
               return (
@@ -84,6 +104,7 @@ export default function Contact() {
           </div>
         )}
 
+        {/* Bản đồ */}
         {contact.mapEmbed && (
           <div className="mt-10">
             <iframe

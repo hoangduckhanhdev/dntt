@@ -2,8 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { AiFillStar } from "react-icons/ai";
-
-const API_BASE = "http://localhost:5000";
+import { API_URL } from "../api/config"; // ✅ dùng config chung
 
 /* =========================
    Helpers
@@ -78,7 +77,7 @@ export default function CourseDetail() {
   const fetchCourse = async () => {
     try {
       setErr("");
-      const res = await axios.get(`${API_BASE}/api/courses/${id}`);
+      const res = await axios.get(`${API_URL}/courses/${id}`); // ✅ dùng API_URL
       setCourse(res.data);
     } catch (e) {
       console.error(e);
@@ -171,7 +170,7 @@ export default function CourseDetail() {
     e.preventDefault();
     try {
       setSubmitting(true);
-      await axios.post(`${API_BASE}/api/courses/${id}/reviews`, {
+      await axios.post(`${API_URL}/courses/${id}/reviews`, { // ✅ dùng API_URL
         userName: newReview.user,
         rating: newReview.rating,
         comment: newReview.comment,
@@ -212,9 +211,7 @@ export default function CourseDetail() {
 
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <Stars value={ratingValue} />
-            <span className="text-slate-600">
-              ({reviewsCount} đánh giá)
-            </span>
+            <span className="text-slate-600">({reviewsCount} đánh giá)</span>
             <span className="text-slate-600">
               👥 {students.toLocaleString("vi-VN")} học viên
             </span>
@@ -342,9 +339,7 @@ export default function CourseDetail() {
                   </div>
                 ))
               ) : (
-                <p className="text-slate-500 italic">
-                  Chưa có đánh giá nào.
-                </p>
+                <p className="text-slate-500 italic">Chưa có đánh giá nào.</p>
               )}
             </div>
 
