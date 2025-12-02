@@ -1,7 +1,7 @@
 // src/components/.../Chatbox.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import {
-  FaHeadset,      // icon người hỗ trợ đeo tai nghe
+  FaHeadset,
   FaPaperPlane,
   FaTimes,
   FaMicrophone,
@@ -11,39 +11,84 @@ import {
 import { useNavigate } from "react-router-dom";
 import { aiChat, uploadImage, textToSpeech } from "../../services/aiClient";
 
+// Helper lấy user hiện tại từ localStorage
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    return null;
+  }
+}
+
 export default function Chatbox() {
   const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [pendingImages, setPendingImages] = useState([]); // URL ảnh đã upload
-
-  // ✅ Lấy lịch sử chat từ localStorage (nếu có)
-  const [messages, setMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem("hk_chat_messages");
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [
-      {
-        role: "assistant",
-        content:
-          "Xin chào 👋 Mình là trợ lý HKCode. Bạn cần tư vấn khóa học, hay hướng dẫn đăng ký/thanh toán?",
-      },
-    ];
-  });
-
   const [loading, setLoading] = useState(false);
+
+  // 👉 State user hiện tại
+  const [user, setUser] = useState(() => getCurrentUser());
+
+  // Lắng nghe thay đổi localStorage "user" (trong tab khác / lúc login/logout)
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "user") {
+        setUser(getCurrentUser());
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  // 👉 KEY lưu chat theo từng user
+  const storageKey = useMemo(
+    () => `hk_chat_messages_${user?._id || "guest"}`,
+    [user?._id]
+  );
+
+  // Messages
+  const [messages, setMessages] = useState([]);
 
   const listRef = useRef(null);
   const fileRef = useRef(null);
 
-  // ✅ Mỗi khi messages đổi → lưu lại
+  // ✅ Khi storageKey thay đổi (user khác) → load lịch sử tương ứng
   useEffect(() => {
     try {
-      localStorage.setItem("hk_chat_messages", JSON.stringify(messages));
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        setMessages(JSON.parse(saved));
+      } else {
+        // Nếu chưa có lịch sử cho user này → set câu chào mặc định
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              "Xin chào 👋 Mình là trợ lý HKCode. Bạn cần tư vấn khóa học, hay hướng dẫn đăng ký/thanh toán?",
+          },
+        ]);
+      }
+    } catch {
+      setMessages([
+        {
+          role: "assistant",
+          content:
+            "Xin chào 👋 Mình là trợ lý HKCode. Bạn cần tư vấn khóa học, hay hướng dẫn đăng ký/thanh toán?",
+        },
+      ]);
+    }
+  }, [storageKey]);
+
+  // ✅ Mỗi khi messages đổi → lưu theo key của user hiện tại
+  useEffect(() => {
+    try {
+      if (messages && messages.length) {
+        localStorage.setItem(storageKey, JSON.stringify(messages));
+      }
     } catch {}
-  }, [messages]);
+  }, [messages, storageKey]);
 
   // Tự scroll xuống cuối khi mở / chat mới
   useEffect(() => {
@@ -125,7 +170,6 @@ export default function Chatbox() {
     const href = a.getAttribute("href");
     if (!href) return;
 
-    // Nếu là link nội bộ tới course → dùng navigate SPA
     if (href.startsWith("/course/")) {
       e.preventDefault();
       navigate(href);
@@ -149,12 +193,13 @@ export default function Chatbox() {
     setLoading(true);
 
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "null");
-      const reply = await aiChat({ messages: [...messages, userMsg], user });
+      const currentUser = getCurrentUser(); // dùng helper
+      const reply = await aiChat({
+        messages: [...messages, userMsg],
+        user: currentUser,
+      });
       const botMsg = { role: "assistant", content: reply };
       setMessages((m) => [...m, botMsg]);
-      // Nếu muốn auto đọc luôn:
-      // speak(reply);
     } catch (err) {
       console.error(err);
       setMessages((m) => [
@@ -169,7 +214,7 @@ export default function Chatbox() {
   /* ================== UI ================== */
   return (
     <>
-      {/* Nút mở chat – icon người hỗ trợ đeo tai nghe, lắc qua lại */}
+      {/* Nút mở chat */}
       {!open && (
         <button
           aria-label="Mở chat"
@@ -179,8 +224,8 @@ export default function Chatbox() {
             rounded-full bg-primary text-white
             shadow-soft hover:shadow-lg
             p-3
-            animate-chat-wiggle      /* 👈 animation lắc */
-            hover:animate-none       /* di chuột vào thì đứng yên */
+            animate-chat-wiggle
+            hover:animate-none
           "
         >
           <span className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-primary">
