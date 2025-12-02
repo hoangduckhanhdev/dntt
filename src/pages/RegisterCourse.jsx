@@ -1,3 +1,4 @@
+// src/pages/RegisterCourse.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useParams, useLocation } from "react-router-dom";
@@ -5,6 +6,7 @@ import axios from "axios";
 
 import { API_URL } from "../api/config";
 import { createPayment } from "../api/ordersApi";
+import slide3 from "../assets/images/slide3.jpg"; // ✅ IMPORT ẢNH ĐÚNG CÁCH
 
 export default function RegisterCourse() {
   const { id: routeCourseId } = useParams();
@@ -135,7 +137,7 @@ export default function RegisterCourse() {
         </div>
 
         <motion.img
-          src="/src/assets/images/slide3.jpg"
+          src={slide3} // ✅ DÙNG IMPORT, KHÔNG DÙNG "/src/..."
           alt="Register Illustration"
           className="w-3/4 mx-auto rounded-2xl shadow-lg border border-white/30"
           initial={{ opacity: 0, y: 30 }}
@@ -150,10 +152,15 @@ export default function RegisterCourse() {
           Đăng ký khóa học
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-5 max-w-md mx-auto w-full">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5 max-w-md mx-auto w-full"
+        >
           {/* Name */}
           <div>
-            <label className="block font-medium text-gray-700 mb-1">Họ và tên</label>
+            <label className="block font-medium text-gray-700 mb-1">
+              Họ và tên
+            </label>
             <input
               type="text"
               name="studentName"
@@ -167,7 +174,9 @@ export default function RegisterCourse() {
 
           {/* Email */}
           <div>
-            <label className="block font-medium text-gray-700 mb-1">Email</label>
+            <label className="block font-medium text-gray-700 mb-1">
+              Email
+            </label>
             <input
               type="email"
               name="email"
@@ -181,7 +190,9 @@ export default function RegisterCourse() {
 
           {/* Phone */}
           <div>
-            <label className="block font-medium text-gray-700 mb-1">Số điện thoại</label>
+            <label className="block font-medium text-gray-700 mb-1">
+              Số điện thoại
+            </label>
             <input
               type="text"
               name="phone"
@@ -197,7 +208,9 @@ export default function RegisterCourse() {
 
           {/* Course */}
           <div>
-            <label className="block font-medium text-gray-700 mb-1">Khóa học</label>
+            <label className="block font-medium text-gray-700 mb-1">
+              Khóa học
+            </label>
 
             <select
               name="courseId"
