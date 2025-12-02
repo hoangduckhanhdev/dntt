@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { FaBars, FaTimes, FaUserCircle } from "react-icons/fa";
 import CartBadge from "./CartBadge";
-import FeedNotificationBell from "./feed/FeedNotificationBell"; // 🔔 THÊM DÒNG NÀY
+import FeedNotificationBell from "./feed/FeedNotificationBell";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -14,11 +14,15 @@ export default function Header() {
 
   // Lấy user từ localStorage khi load
   useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem("user"));
-    setUser(storedUser);
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+      setUser(storedUser);
+    } catch {
+      setUser(null);
+    }
   }, []);
 
-  // Click ngoài menu thì ẩn dropdown
+  // Click ngoài menu thì ẩn dropdown user
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (userRef.current && !userRef.current.contains(e.target)) {
@@ -34,6 +38,7 @@ export default function Header() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
+    setUserMenuOpen(false);
     navigate("/");
     window.location.reload();
   };
@@ -73,7 +78,7 @@ export default function Header() {
             Khoá học của tôi
           </NavLink>
 
-          {/* 🔥 Bảng tin học tập */}
+          {/* Bảng tin học tập */}
           <NavLink to="/learn-feed" className={navClass}>
             Bảng tin
           </NavLink>
@@ -100,91 +105,142 @@ export default function Header() {
           {/* 🔔 Thông báo LearnFeed – chỉ hiển thị khi đã login */}
           {user && <FeedNotificationBell />}
 
-          {/* Auth actions */}
-          {!user ? (
-            <>
-              <button
-                onClick={() => navigate("/login")}
-                className="hidden md:inline-flex btn btn-ghost"
-              >
-                Đăng nhập
-              </button>
-              <button
-                onClick={() => navigate("/register")}
-                className="hidden md:inline-flex btn btn-primary"
-              >
-                Đăng ký
-              </button>
-            </>
-          ) : (
-            <div className="relative">
-              {/* Avatar */}
-              {user.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt="avatar"
+          {/* Khu vực tài khoản */}
+          <div className="relative flex items-center">
+            {/* Khi CHƯA đăng nhập */}
+            {!user && (
+              <>
+                {/* Nút desktop */}
+                <button
+                  onClick={() => navigate("/login")}
+                  className="hidden md:inline-flex btn btn-ghost"
+                >
+                  Đăng nhập
+                </button>
+                <button
+                  onClick={() => navigate("/register")}
+                  className="hidden md:inline-flex btn btn-primary"
+                >
+                  Đăng ký
+                </button>
+
+                {/* Icon avatar cho MOBILE */}
+                <button
+                  type="button"
+                  className="md:hidden text-2xl text-gray-700 hover:text-primary"
                   onClick={() => setUserMenuOpen((v) => !v)}
-                  className="w-9 h-9 rounded-full object-cover border border-border cursor-pointer hover:ring-2 hover:ring-primary transition"
-                />
-              ) : (
-                <FaUserCircle
-                  size={34}
-                  className="text-gray-600 cursor-pointer hover:text-primary transition"
-                  onClick={() => setUserMenuOpen((v) => !v)}
-                />
-              )}
+                  aria-label="Mở menu tài khoản"
+                >
+                  <FaUserCircle />
+                </button>
+              </>
+            )}
 
-              {/* Dropdown */}
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-3 w-56 rounded-2xl border border-border bg-white shadow-soft animate-[fadeIn_0.2s_ease-out]">
-                  {/* caret */}
-                  <div className="absolute -top-2 right-4 h-3 w-3 rotate-45 bg-white border-l border-t border-border"></div>
+            {/* Khi ĐÃ đăng nhập */}
+            {user && (
+              <>
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt="avatar"
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    className="w-9 h-9 rounded-full object-cover border border-border cursor-pointer hover:ring-2 hover:ring-primary transition"
+                  />
+                ) : (
+                  <FaUserCircle
+                    size={34}
+                    className="text-gray-600 cursor-pointer hover:text-primary transition"
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                  />
+                )}
+              </>
+            )}
 
-                  <div className="px-4 py-3 border-b border-border">
-                    <p className="font-semibold text-dark truncate">
-                      {user.name}
-                    </p>
-                    <p className="text-sm text-muted truncate">{user.email}</p>
-                  </div>
+            {/* Dropdown tài khoản (dùng chung cho cả mobile & desktop) */}
+            {userMenuOpen && (
+              <div className="absolute right-0 mt-3 w-56 rounded-2xl border border-border bg-white shadow-soft animate-[fadeIn_0.2s_ease-out]">
+                {/* caret */}
+                <div className="absolute -top-2 right-4 h-3 w-3 rotate-45 bg-white border-l border-t border-border"></div>
 
-                  <Link
-                    to="/my-courses"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="block px-4 py-2.5 text-sm hover:bg-primaryLight"
-                  >
-                    Khoá học của tôi
-                  </Link>
+                {/* Nếu đã login → show info + menu đầy đủ */}
+                {user ? (
+                  <>
+                    <div className="px-4 py-3 border-b border-border">
+                      <p className="font-semibold text-dark truncate">
+                        {user.name}
+                      </p>
+                      <p className="text-sm text-muted truncate">
+                        {user.email}
+                      </p>
+                    </div>
 
-                  <Link
-                    to="/profile"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="block px-4 py-2.5 text-sm hover:bg-primaryLight"
-                  >
-                    Hồ sơ cá nhân
-                  </Link>
-
-                  {user.role === "admin" && (
-                    <Link
-                      to="/admin"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="block px-4 py-2.5 text-sm hover:bg-primaryLight"
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        navigate("/my-courses");
+                      }}
+                      className="block w-full text-left px-4 py-2.5 text-sm hover:bg-primaryLight"
                     >
-                      Trang quản trị
-                    </Link>
-                  )}
+                      Khoá học của tôi
+                    </button>
 
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-b-2xl"
-                  >
-                    Đăng xuất
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        navigate("/profile");
+                      }}
+                      className="block w-full text-left px-4 py-2.5 text-sm hover:bg-primaryLight"
+                    >
+                      Hồ sơ cá nhân
+                    </button>
 
-          {/* Mobile toggle */}
+                    {user.role === "admin" && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          navigate("/admin");
+                        }}
+                        className="block w-full text-left px-4 py-2.5 text-sm hover:bg-primaryLight"
+                      >
+                        Trang quản trị
+                      </button>
+                    )}
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-b-2xl"
+                    >
+                      Đăng xuất
+                    </button>
+                  </>
+                ) : (
+                  // Nếu chưa login → menu Đăng nhập / Đăng ký (cho mobile)
+                  <div className="py-2">
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        navigate("/login");
+                      }}
+                      className="block w-full text-left px-4 py-2.5 text-sm hover:bg-primaryLight"
+                    >
+                      Đăng nhập
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        navigate("/register");
+                      }}
+                      className="block w-full text-left px-4 py-2.5 text-sm hover:bg-primaryLight"
+                    >
+                      Đăng ký
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile toggle menu chính */}
           <button
             className="md:hidden text-2xl text-dark"
             onClick={() => setMenuOpen((v) => !v)}
@@ -226,7 +282,6 @@ export default function Header() {
           >
             Khoá học của tôi
           </NavLink>
-          {/* Bảng tin (Mobile) */}
           <NavLink
             to="/learn-feed"
             className="nav-link py-2"
@@ -263,6 +318,7 @@ export default function Header() {
             Liên hệ
           </NavLink>
 
+          {/* Nút login/register trong menu mobile vẫn giữ, cho dễ thấy hơn */}
           {!user && (
             <div className="mt-2 grid grid-cols-2 gap-3">
               <button
