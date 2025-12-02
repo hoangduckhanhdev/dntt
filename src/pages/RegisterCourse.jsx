@@ -6,7 +6,7 @@ import axios from "axios";
 
 import { API_URL } from "../api/config";
 import { createPayment } from "../api/ordersApi";
-import slide3 from "../assets/images/slide3.jpg"; // ✅ IMPORT ẢNH ĐÚNG CÁCH
+import slide3 from "../assets/images/slide3.jpg";
 
 export default function RegisterCourse() {
   const { id: routeCourseId } = useParams();
@@ -123,11 +123,12 @@ export default function RegisterCourse() {
 
   /* ===================== UI ===================== */
   return (
-    <div className="flex flex-col md:flex-row h-screen">
+    // ❌ bỏ h-screen, dùng min-h-screen để không bị bóp trên mobile
+    <div className="flex flex-col md:flex-row min-h-screen">
       {/* Left panel */}
-      <div className="md:w-1/2 bg-gradient-to-br from-orange-500 via-orange-400 to-orange-300 text-white flex flex-col justify-between p-10">
-        <div>
-          <h2 className="text-4xl font-extrabold mb-4 drop-shadow-md">
+      <div className="md:w-1/2 bg-gradient-to-br from-orange-500 via-orange-400 to-orange-300 text-white flex flex-col justify-between p-6 md:p-10">
+        <div className="max-w-xl mx-auto w-full">
+          <h2 className="text-3xl md:text-4xl font-extrabold mb-4 drop-shadow-md">
             Đăng ký ngay hôm nay!
           </h2>
           <p className="text-orange-50 mb-6 leading-relaxed text-justify">
@@ -136,18 +137,28 @@ export default function RegisterCourse() {
           </p>
         </div>
 
-        <motion.img
-          src={slide3} // ✅ DÙNG IMPORT, KHÔNG DÙNG "/src/..."
-          alt="Register Illustration"
-          className="w-3/4 mx-auto rounded-2xl shadow-lg border border-white/30"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1 }}
-        />
+        {/* Ảnh tràn full panel bên trái */}
+        <div className="mt-4 flex-1 flex items-end">
+          <motion.img
+            src={slide3}
+            alt="Register Illustration"
+            className="
+              w-full            /* full chiều ngang panel */
+              h-auto
+              rounded-none md:rounded-3xl
+              shadow-lg
+              border border-white/30
+              max-w-none
+            "
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1 }}
+          />
+        </div>
       </div>
 
       {/* Right panel */}
-      <div className="md:w-1/2 bg-white p-10 flex flex-col justify-center shadow-inner">
+      <div className="md:w-1/2 bg-white p-6 md:p-10 flex flex-col justify-center shadow-inner pb-24">
         <h2 className="text-3xl font-bold text-center text-orange-600 mb-6">
           Đăng ký khóa học
         </h2>
