@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import CourseCard from "../components/CourseCard";
+import { API_URL } from "../api/config"; // ✅ THÊM DÒNG NÀY
 
 export default function Courses() {
   const [courses, setCourses] = useState([]);
@@ -15,14 +16,24 @@ export default function Courses() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setErr("");
+        setLoading(true);
+
         const [courseRes, categoryRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/courses"),
-          axios.get("http://localhost:5000/api/category"),
+          // ❌ KHÔNG dùng localhost nữa
+          // axios.get("http://localhost:5000/api/courses"),
+          // axios.get("http://localhost:5000/api/category"),
+
+          // ✅ Dùng API_URL đã config (Render sẽ tự dùng https://hkcode.onrender.com)
+          axios.get(`${API_URL}/courses`),
+          axios.get(`${API_URL}/category`),
         ]);
+
+        // tuỳ backend trả về, mình giữ nguyên logic cũ
         setCourses(courseRes.data || []);
         setCategories(categoryRes.data || []);
       } catch (e) {
-        console.error(e);
+        console.error("Lỗi tải khoá học / danh mục:", e);
         setErr("Không tải được dữ liệu. Vui lòng thử lại.");
       } finally {
         setLoading(false);
@@ -90,9 +101,7 @@ export default function Courses() {
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-orange-600">
               Khám phá khoá học
             </h1>
-            <p className="mt-2 text-gray-600">
-              
-            </p>
+            <p className="mt-2 text-gray-600"></p>
 
             {/* Filter bar */}
             <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -169,7 +178,6 @@ export default function Courses() {
           </div>
         ) : displayed.length ? (
           <>
-            {/* Nếu chọn All, nhóm theo danh mục để giống “web lớn” */}
             {selectedCategory === "all" ? (
               categories.map((cat) => {
                 const group = displayed.filter(
