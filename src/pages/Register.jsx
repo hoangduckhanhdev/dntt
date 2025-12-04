@@ -4,6 +4,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../api/authApi";
 import Swal from "sweetalert2";
 
+// 👉 URL backend (giống chỗ bạn đang dùng ở Login, nếu có thì copy từ đó sang)
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
@@ -42,11 +46,18 @@ export default function Register() {
 
       navigate("/login");
     } catch (err) {
-      const msg = err?.response?.data?.message || "Đăng ký thất bại, thử lại sau!";
+      const msg =
+        err?.response?.data?.message || "Đăng ký thất bại, thử lại sau!";
       setError(msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 👉 Đăng ký / đăng nhập nhanh bằng Google (dùng chung endpoint với Login)
+  const handleGoogleRegister = () => {
+    const redirect = encodeURIComponent("/"); // sau khi xong quay về trang chủ, bạn đổi path tùy ý
+    window.location.href = `${API_BASE_URL}/api/auth/google?redirect=${redirect}`;
   };
 
   return (
@@ -99,7 +110,9 @@ export default function Register() {
                 placeholder="••••••••"
                 value={form.password}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none pr-10"
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, password: e.target.value })
+                }
                 required
               />
               <button
@@ -139,9 +152,31 @@ export default function Register() {
           </button>
         </form>
 
+        {/* --- CHIA ĐƯỜNG --- */}
+        <div className="flex items-center gap-2 my-4">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-xs text-gray-400">hoặc</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
+
+        {/* NÚT GOOGLE */}
+        <button
+          type="button"
+          onClick={handleGoogleRegister}
+          className="w-full border border-gray-300 rounded-xl py-2.5 flex items-center justify-center gap-2 hover:bg-gray-50 transition-all"
+        >
+          {/* Nếu bạn có icon Google thì đặt vào đây, ví dụ <img src="/google.svg" .../> */}
+          <span className="text-sm font-medium text-gray-700">
+            Đăng ký nhanh với Google
+          </span>
+        </button>
+
         <p className="text-center text-gray-600 mt-6 text-sm">
           Đã có tài khoản?{" "}
-          <Link to="/login" className="text-orange-500 font-semibold hover:underline">
+          <Link
+            to="/login"
+            className="text-orange-500 font-semibold hover:underline"
+          >
             Đăng nhập
           </Link>
         </p>
