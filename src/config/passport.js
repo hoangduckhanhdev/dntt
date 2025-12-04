@@ -5,11 +5,15 @@ const { Strategy: JwtStrategy, ExtractJwt } = require("passport-jwt");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User");
 
+/* ===================== 🔗 BACKEND URL (cho Google callback) ===================== */
+// Dùng env khi deploy, fallback localhost khi dev
+const backendURL = process.env.BACKEND_URL || "http://localhost:5000";
+
 /* ===================== 🔐 JWT STRATEGY ===================== */
 // Lấy token từ header Authorization: Bearer <token>
 const jwtOptions = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: process.env.JWT_SECRET || "secret", // phải trùng với secret khi bạn ký token
+  secretOrKey: process.env.JWT_SECRET || "secret", // phải trùng với secret khi ký token
 };
 
 // Strategy tên "jwt" -> dùng cho passport.authenticate("jwt", { session: false })
@@ -40,7 +44,8 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:5000/api/auth/google/callback",
+      // ✅ KHÔNG hard-code localhost nữa
+      callbackURL: `${backendURL}/api/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -68,7 +73,7 @@ passport.use(
           email: profile.emails?.[0]?.value,
           avatar: profile.photos?.[0]?.value,
           password: "google_oauth_no_password", // đúng như bạn đang dùng
-          role: "student", // nếu muốn set mặc định vai trò
+          role: "student", // mặc định học viên
         });
 
         return done(null, newUser);
