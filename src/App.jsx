@@ -1,7 +1,9 @@
 // src/App.jsx
 import React, { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
+import axios from "axios";
 import { getSocket } from "./hooks/useSocket";
+import { API_URL } from "./api/config";
 
 // Layouts
 import UserLayout from "./layouts/UserLayout";
@@ -39,6 +41,7 @@ import LearnFeedPage from "./pages/LearnFeedPage";
 import StudentSkillReport from "./pages/StudentSkillReport";
 import StudyRoomList from "./pages/StudyRoomList";
 import StudyRoomDetail from "./pages/StudyRoomDetail";
+
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
@@ -62,14 +65,13 @@ import CourseSkillMapPage from "./pages/CourseSkillMapPage";
 import AdminCourseSkillMapEditor from "./pages/admin/AdminCourseSkillMapEditor";
 import AdminSkillList from "./pages/admin/AdminSkillList";
 import AdminStudyRooms from "./pages/admin/AdminStudyRooms";
-
 import AdminExamAttempts from "./pages/admin/AdminExamAttempts";
 import AdminExamAttemptDetail from "./pages/admin/AdminExamAttemptDetail";
-
 import AdminQuestionBank from "./pages/admin/AdminQuestionBank";
 import AdminQuestionForm from "./pages/admin/AdminQuestionForm";
 
 export default function App() {
+  // 🔌 Kết nối socket
   useEffect(() => {
     const socket = getSocket();
     socket.on("connect", () => console.log("Socket connected:", socket.id));
@@ -77,6 +79,55 @@ export default function App() {
       console.log("Socket disconnected:", reason)
     );
     return () => socket.disconnect();
+  }, []);
+
+  // 🔐 Nhặt token từ URL (Google login redirect) và lưu vào localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (!token) return;
+
+    // Lưu token
+    localStorage.setItem("token", token);
+
+    (async () => {
+      try {
+        // 🟢 Nếu backend có /auth/me thì dùng luôn cho chuẩn
+        const res = await axios.get(`${API_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const user = res.data?.user || res.data;
+        if (user) {
+          localStorage.setItem("user", JSON.stringify(user));
+        }
+      } catch (err) {
+        console.warn("Không gọi được /auth/me, fallback decode JWT:", err);
+        // 🔁 Fallback: tự decode JWT để lấy id + email
+        try {
+          const parts = token.split(".");
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            const user = {
+              _id: payload.id,
+              email: payload.email,
+            };
+            localStorage.setItem("user", JSON.stringify(user));
+          }
+        } catch (e) {
+          console.error("Decode token thất bại:", e);
+        }
+      } finally {
+        // Xoá ?token khỏi URL cho sạch
+        const url = new URL(window.location.href);
+        url.searchParams.delete("token");
+        window.history.replaceState({}, "", url.toString());
+
+        // Reload để Header đọc lại user từ localStorage
+        window.location.reload();
+      }
+    })();
   }, []);
 
   return (
@@ -109,8 +160,14 @@ export default function App() {
           <Route path="register-fail" element={<RegisterFail />} />
           <Route path="register-success" element={<RegisterSuccess />} />
           <Route path="my-courses" element={<MyCourses />} />
-          <Route path="/courses/:courseId/skill-map" element={<CourseSkillMapPage />} />
-          <Route path="/learning/skill-report" element={<StudentSkillReport />} />
+          <Route
+            path="/courses/:courseId/skill-map"
+            element={<CourseSkillMapPage />}
+          />
+          <Route
+            path="/learning/skill-report"
+            element={<StudentSkillReport />}
+          />
           <Route path="/study-rooms" element={<StudyRoomList />} />
           <Route path="/study-rooms/:roomId" element={<StudyRoomDetail />} />
           {/* 🔹 LearnFeed - Bảng tin học tập (dùng UserLayout) */}

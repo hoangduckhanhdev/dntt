@@ -29,8 +29,7 @@ export const updateUser = (id, formData) =>
    🔹 Cập nhật role
 ================================ */
 export const updateUserRole = (id, role) =>
-  api.patch(`${ADMIN_USER_BASE}/${id}/role`, { role });
-
+  api.put(`${ADMIN_USER_BASE}/${id}`, { role });
 /* ================================
    🔹 Đổi mật khẩu user
 ================================ */

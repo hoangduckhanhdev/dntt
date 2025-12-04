@@ -1,9 +1,10 @@
+// src/pages/Login.jsx
 import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { loginUser } from "../api/authApi";
 import Swal from "sweetalert2";
-import { API_BASE_URL } from "../api/config"; // ⬅️ URL backend chuẩn
+import { API_BASE_URL } from "../api/config"; // = API_URL (đã gồm /api)
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -46,7 +47,12 @@ export default function Login() {
 
       navigate(redirect, { replace: true });
     } catch (err) {
-      const msg = err?.response?.data?.message || "Sai email hoặc mật khẩu";
+      // ⬇ err đã được interceptor chuẩn hoá -> { status, data, message, url, method }
+      const msg =
+        err?.message ||
+        err?.data?.message ||
+        "Sai email hoặc mật khẩu, vui lòng thử lại.";
+
       setError(msg);
 
       Swal.fire({
@@ -61,10 +67,8 @@ export default function Login() {
   };
 
   const handleGoogleLogin = () => {
-    // ⛔ TRƯỚC: localhost → gây lỗi trên điện thoại
-    // window.location.href = `http://localhost:5000/api/auth/google?...`
-
-    // ✅ SAU: dùng API_BASE_URL chạy trên cả mobile + Render
+    // API_BASE_URL hiện đang = API_URL (ví dụ: https://hkcode.onrender.com/api)
+    // => /auth/google -> https://hkcode.onrender.com/api/auth/google  ✅
     window.location.href = `${API_BASE_URL}/auth/google?redirect=${encodeURIComponent(
       redirect
     )}`;
@@ -103,7 +107,9 @@ export default function Login() {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none pr-10"
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, password: e.target.value })
+                }
                 required
               />
               <button
@@ -121,7 +127,10 @@ export default function Login() {
               <input type="checkbox" className="accent-orange-500" />
               <span>Ghi nhớ tôi</span>
             </label>
-            <Link to="/forgot-password" className="text-orange-500 hover:underline">
+            <Link
+              to="/forgot-password"
+              className="text-orange-500 hover:underline"
+            >
               Quên mật khẩu?
             </Link>
           </div>
@@ -137,7 +146,9 @@ export default function Login() {
 
         <div className="flex items-center my-6">
           <div className="flex-grow border-t border-gray-300"></div>
-          <span className="mx-3 text-gray-500 text-sm">hoặc tiếp tục với</span>
+          <span className="mx-3 text-gray-500 text-sm">
+            hoặc tiếp tục với
+          </span>
           <div className="flex-grow border-t border-gray-300"></div>
         </div>
 
@@ -151,7 +162,9 @@ export default function Login() {
               alt="Google"
               className="w-5 h-5"
             />
-            <span className="text-gray-700 font-medium">Đăng nhập với Google</span>
+            <span className="text-gray-700 font-medium">
+              Đăng nhập với Google
+            </span>
           </button>
         </div>
 
