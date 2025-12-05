@@ -1,7 +1,7 @@
 // src/components/Header.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { FaBars, FaTimes, FaUserCircle } from "react-icons/fa";
+import { FaBars, FaTimes, FaUserCircle, FaChevronDown } from "react-icons/fa";
 import CartBadge from "./CartBadge";
 import FeedNotificationBell from "./feed/FeedNotificationBell";
 
@@ -138,27 +138,37 @@ export default function Header() {
 
             {/* Khi ĐÃ đăng nhập */}
             {user && (
-              <>
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen((v) => !v)}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-full border border-border/70 bg-white shadow-sm hover:bg-primaryLight/50 hover:border-primary/70 transition"
+              >
                 {user.avatar ? (
                   <img
                     src={user.avatar}
                     alt="avatar"
-                    onClick={() => setUserMenuOpen((v) => !v)}
-                    className="w-9 h-9 rounded-full object-cover border border-border cursor-pointer hover:ring-2 hover:ring-primary transition"
+                    className="w-8 h-8 rounded-full object-cover border border-border"
                   />
                 ) : (
-                  <FaUserCircle
-                    size={34}
-                    className="text-gray-600 cursor-pointer hover:text-primary transition"
-                    onClick={() => setUserMenuOpen((v) => !v)}
-                  />
+                  <FaUserCircle className="w-7 h-7 text-gray-600" />
                 )}
-              </>
+
+                {/* Thông tin ngắn gọn (ẩn trên mobile, hiện trên md trở lên) */}
+                <div className="hidden md:flex flex-col items-start leading-tight max-w-[160px]">
+                  <span className="text-[11px] text-muted">Tài khoản</span>
+                  <span className="text-sm font-semibold text-gray-800 truncate">
+                    {user.name}
+                  </span>
+                </div>
+
+                {/* mũi tên dropdown – chỉ hiện desktop */}
+                <FaChevronDown className="hidden md:block text-xs text-gray-500" />
+              </button>
             )}
 
             {/* Dropdown tài khoản (dùng chung cho cả mobile & desktop) */}
             {userMenuOpen && (
-              <div className="absolute right-0 mt-3 w-56 rounded-2xl border border-border bg-white shadow-soft animate-[fadeIn_0.2s_ease-out]">
+              <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border bg-white shadow-soft animate-[fadeIn_0.2s_ease-out] z-50">
                 {/* caret */}
                 <div className="absolute -top-2 right-4 h-3 w-3 rotate-45 bg-white border-l border-t border-border"></div>
 

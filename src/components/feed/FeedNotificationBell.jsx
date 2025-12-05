@@ -9,8 +9,15 @@ const getAuthConfig = () => {
   try {
     const token = localStorage.getItem("token");
     const headers = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    return { headers, withCredentials: true };
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return {
+      headers,
+      withCredentials: true,
+    };
   } catch {
     return { withCredentials: true };
   }
@@ -21,7 +28,59 @@ export default function FeedNotificationBell() {
   const [list, setList] = useState([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
   const ref = useRef(null);
+
+  // ==========================
+  // Fetch notifications
+  // ==========================
+  const fetchNotifications = async () => {
+    setErr("");
+
+    // ⛔ Nếu chưa có token thì khỏi gọi API, tránh 401
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setList([]);
+      setUnread(0);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        `${API_BASE}/feed/notifications`,
+        getAuthConfig()
+      );
+
+      const notifications = res.data?.notifications || res.data || [];
+
+      setList(notifications);
+      const unreadCount = notifications.filter(
+        (n) => !n.readAt && !n.isRead
+      ).length;
+      setUnread(unreadCount);
+    } catch (error) {
+      console.error("Load feed notifications error:", error);
+
+      if (error.response?.status === 401) {
+        // Token sai / hết hạn → clear và gợi ý đăng nhập lại
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setErr("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
+      } else {
+        setErr("Không tải được thông báo, vui lòng thử lại.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // mở dropdown thì load
+  useEffect(() => {
+    if (open) {
+      fetchNotifications();
+    }
+  }, [open]);
 
   // click ngoài thì đóng
   useEffect(() => {
@@ -34,123 +93,64 @@ export default function FeedNotificationBell() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(
-        `${API_BASE}/feed/notifications`,
-        getAuthConfig()
-      );
-      const data = res.data || [];
-      setList(data);
-      setUnread(data.filter((n) => !n.isRead).length);
-    } catch (err) {
-      console.error("Load feed notifications error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // load lần đầu
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  // mở dropdown lần đầu thì đánh dấu đã đọc
-  const handleToggle = async () => {
-    const next = !open;
-    setOpen(next);
-
-    if (next && unread > 0) {
-      try {
-        await axios.patch(
-          `${API_BASE}/feed/notifications/read-all`,
-          {},
-          getAuthConfig()
-        );
-        setUnread(0);
-        // local update
-        setList((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      } catch (err) {
-        console.error("read-all notifications error:", err);
-      }
-    }
-  };
-
-  const renderText = (n) => {
-    const actor = n.actor?.name || "Ai đó";
-    if (n.type === "like") return `${actor} đã thích bài viết của bạn`;
-    if (n.type === "comment") return `${actor} đã bình luận bài viết của bạn`;
-    return `${actor} có hoạt động mới trên bài viết của bạn`;
-  };
-
   return (
     <div className="relative" ref={ref}>
       <button
-        type="button"
-        onClick={handleToggle}
-        className="relative p-2 rounded-full hover:bg-orange-50 transition"
+        onClick={() => setOpen((o) => !o)}
+        className="relative p-2 rounded-full hover:bg-gray-100"
       >
-        <FiBell className="text-orange-500" size={20} />
+        <FiBell className="w-6 h-6" />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-[10px] text-white flex items-center justify-center">
-            {unread > 9 ? "9+" : unread}
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1">
+            {unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-lg z-40 text-sm">
-          <div className="px-3 py-2 border-b bg-orange-50/60 rounded-t-2xl flex items-center justify-between">
-            <span className="font-semibold text-slate-800">
-              Thông báo LearnFeed
+        <div className="absolute right-0 mt-2 w-80 bg-white shadow-lg rounded-lg border z-50">
+          <div className="px-4 py-2 border-b flex items-center justify-between">
+            <span className="font-semibold text-sm">
+              Thông báo hoạt động
             </span>
-            <button
-              onClick={fetchNotifications}
-              className="text-[11px] text-orange-600 hover:underline"
-            >
-              Làm mới
-            </button>
+            {loading && (
+              <span className="text-xs text-gray-400">Đang tải...</span>
+            )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
-            {loading && (
-              <div className="px-3 py-3 text-xs text-slate-500">
-                Đang tải...
-              </div>
-            )}
+          {err && (
+            <div className="px-4 py-2 text-xs text-red-500">{err}</div>
+          )}
 
-            {!loading && list.length === 0 && (
-              <div className="px-3 py-3 text-xs text-slate-500">
+          <div className="max-h-96 overflow-y-auto">
+            {list.length === 0 && !loading && !err && (
+              <div className="px-4 py-4 text-sm text-gray-500">
                 Chưa có thông báo nào.
               </div>
             )}
 
-            {!loading &&
-              list.map((n) => (
-                <div
-                  key={n._id}
-                  className={`px-3 py-2.5 border-b last:border-b-0 cursor-default ${
-                    n.isRead ? "bg-white" : "bg-orange-50/40"
-                  }`}
-                >
-                  <div className="flex gap-2">
-                    <img
-                      src={n.actor?.avatar || "/default-avatar.png"}
-                      alt=""
-                      className="w-7 h-7 rounded-full bg-slate-100 object-cover"
-                    />
-                    <div className="flex-1">
-                      <div className="text-[13px] text-slate-800">
-                        {renderText(n)}
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {new Date(n.createdAt).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
+            {list.map((item) => (
+              <div
+                key={item._id || item.id}
+                className={`px-4 py-3 text-sm border-b last:border-b-0 ${
+                  !item.readAt && !item.isRead
+                    ? "bg-blue-50"
+                    : "bg-white"
+                }`}
+              >
+                <div className="font-medium">
+                  {item.title || "Hoạt động mới"}
                 </div>
-              ))}
+                <div className="text-xs text-gray-600">
+                  {item.message || item.content}
+                </div>
+                {item.createdAt && (
+                  <div className="mt-1 text-[11px] text-gray-400">
+                    {new Date(item.createdAt).toLocaleString("vi-VN")}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

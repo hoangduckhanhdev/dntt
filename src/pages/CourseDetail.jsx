@@ -1,3 +1,4 @@
+// src/pages/CourseDetail.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
@@ -52,6 +53,47 @@ const Stars = ({ value = 0, size = 18, className = "" }) => {
 };
 
 /* =========================
+   Star selector để gửi đánh giá
+========================= */
+const StarSelector = ({ value = 5, onChange }) => {
+  const [hover, setHover] = useState(0);
+  const stars = [1, 2, 3, 4, 5];
+  const active = hover || value;
+
+  return (
+    <div className="flex items-center gap-1">
+      {stars.map((s) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => onChange(s)}
+          onMouseEnter={() => setHover(s)}
+          onMouseLeave={() => setHover(0)}
+          className="text-2xl leading-none"
+        >
+          <AiFillStar
+            className={s <= active ? "text-yellow-400" : "text-gray-300"}
+          />
+        </button>
+      ))}
+      <span className="ml-2 text-sm text-slate-600">{value} sao</span>
+    </div>
+  );
+};
+
+/* =========================
+   Lấy user hiện tại từ localStorage
+========================= */
+const getCurrentUser = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+/* =========================
    Page
 ========================= */
 export default function CourseDetail() {
@@ -63,7 +105,6 @@ export default function CourseDetail() {
   const [err, setErr] = useState("");
 
   const [newReview, setNewReview] = useState({
-    user: "",
     rating: 5,
     comment: "",
   });
@@ -72,6 +113,12 @@ export default function CourseDetail() {
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
   const [added, setAdded] = useState(false);
+
+  // 👉 trạng thái ẩn/bỏ bớt đánh giá
+  const [showAllReviews, setShowAllReviews] = useState(false);
+
+  const currentUser = getCurrentUser();
+  const token = localStorage.getItem("token");
 
   // ===== API =====
   const fetchCourse = async () => {
@@ -91,6 +138,7 @@ export default function CourseDetail() {
     setLoading(true);
     fetchCourse();
     window.scrollTo(0, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading)
@@ -115,8 +163,15 @@ export default function CourseDetail() {
     course?.teacher?.name ||
     (typeof course?.teacher === "string" ? course.teacher : "Chưa có");
   const ratingValue = Number(course?.rating ?? 0);
-  const reviewsCount = Number(course?.reviews?.length ?? 0);
+  const reviews = course.reviews || [];
+  const reviewsCount = reviews.length;
   const students = Number(course?.students ?? 0);
+
+  // 👉 Số review hiển thị khi thu gọn (giống Shopee/TikTok: 2 cái đầu)
+  const MAX_COLLAPSED = 2;
+  const visibleReviews = showAllReviews
+    ? reviews
+    : reviews.slice(0, MAX_COLLAPSED);
 
   const demoUrlRaw =
     course?.demoVideo || course?.videoDemo || course?.introVideo || "";
@@ -168,16 +223,41 @@ export default function CourseDetail() {
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
+
+    if (!token || !currentUser) {
+      alert("Bạn cần đăng nhập để đánh giá khoá học.");
+      navigate("/login");
+      return;
+    }
+
+    if (!newReview.comment.trim()) {
+      alert("Vui lòng nhập nội dung nhận xét.");
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await axios.post(`${API_URL}/courses/${id}/reviews`, { // ✅ dùng API_URL
-        userName: newReview.user,
-        rating: newReview.rating,
-        comment: newReview.comment,
-      });
+      await axios.post(
+        `${API_URL}/courses/${id}/reviews`,
+        {
+          // ❗ Không gửi userName, backend tự lấy từ req.user
+          rating: newReview.rating,
+          comment: newReview.comment,
+        },
+        {
+          headers: token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {},
+          withCredentials: true,
+        }
+      );
+
       await fetchCourse();
-      setNewReview({ user: "", rating: 5, comment: "" });
-    } catch {
+      setNewReview({ rating: 5, comment: "" });
+    } catch (error) {
+      console.error("Send review error:", error);
       alert("Không thể gửi đánh giá. Vui lòng thử lại!");
     } finally {
       setSubmitting(false);
@@ -315,29 +395,44 @@ export default function CourseDetail() {
               </span>
             </div>
 
+            {/* Danh sách đánh giá */}
             <div className="space-y-3">
-              {course.reviews?.length ? (
-                course.reviews.map((r, i) => (
-                  <div
-                    key={i}
-                    className="p-4 rounded-xl bg-orange-50/40 border border-orange-100"
-                  >
-                    <p className="font-semibold text-slate-800">
-                      {r.userName || r.user?.name || "Người dùng"}
-                      <span className="ml-2 inline-flex">
-                        {Array.from({ length: r.rating }).map((_, j) => (
-                          <AiFillStar key={j} className="text-yellow-400" />
-                        ))}
-                      </span>
-                    </p>
-                    <p className="text-slate-700">{r.comment}</p>
-                    {r.createdAt && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        {new Date(r.createdAt).toLocaleDateString("vi-VN")}
+              {reviewsCount ? (
+                <>
+                  {visibleReviews.map((r, i) => (
+                    <div
+                      key={i}
+                      className="p-4 rounded-xl bg-orange-50/40 border border-orange-100"
+                    >
+                      <p className="font-semibold text-slate-800 flex items-center gap-2">
+                        <span>{r.userName || r.user?.name || "Người dùng"}</span>
+                        <span className="inline-flex">
+                          {Array.from({ length: r.rating }).map((_, j) => (
+                            <AiFillStar key={j} className="text-yellow-400" />
+                          ))}
+                        </span>
                       </p>
-                    )}
-                  </div>
-                ))
+                      <p className="text-slate-700">{r.comment}</p>
+                      {r.createdAt && (
+                        <p className="text-xs text-slate-400 mt-1">
+                          {new Date(r.createdAt).toLocaleDateString("vi-VN")}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+
+                  {reviewsCount > MAX_COLLAPSED && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllReviews((v) => !v)}
+                      className="mt-2 text-sm font-medium text-orange-600 hover:text-orange-500"
+                    >
+                      {showAllReviews
+                        ? "Thu gọn bớt đánh giá"
+                        : `Xem thêm ${reviewsCount - MAX_COLLAPSED} đánh giá`}
+                    </button>
+                  )}
+                </>
               ) : (
                 <p className="text-slate-500 italic">Chưa có đánh giá nào.</p>
               )}
@@ -346,48 +441,57 @@ export default function CourseDetail() {
             {/* form gửi đánh giá */}
             <form
               onSubmit={handleReviewSubmit}
-              className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3"
+              className="mt-5 space-y-3 border-t border-orange-100 pt-4"
             >
-              <input
-                className="border border-orange-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-orange-300 outline-none"
-                placeholder="Tên của bạn"
-                value={newReview.user}
-                onChange={(e) =>
-                  setNewReview({ ...newReview, user: e.target.value })
-                }
-                required
-              />
-              <select
-                className="border border-orange-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-orange-300 outline-none"
-                value={newReview.rating}
-                onChange={(e) =>
-                  setNewReview({
-                    ...newReview,
-                    rating: Number(e.target.value),
-                  })
-                }
-              >
-                {[5, 4, 3, 2, 1].map((v) => (
-                  <option key={v} value={v}>
-                    {v} ⭐
-                  </option>
-                ))}
-              </select>
-              <textarea
-                rows="3"
-                className="border border-orange-200 rounded-xl px-3 py-2 sm:col-span-3 focus:ring-2 focus:ring-orange-300 outline-none"
-                placeholder="Nhận xét của bạn…"
-                value={newReview.comment}
-                onChange={(e) =>
-                  setNewReview({
-                    ...newReview,
-                    comment: e.target.value,
-                  })
-                }
-              />
+              {/* Tên user: tự lấy từ tài khoản */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                <div className="sm:col-span-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Tên của bạn
+                  </label>
+                  <input
+                    className="w-full border border-orange-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-700 cursor-not-allowed"
+                    value={currentUser?.name || ""}
+                    placeholder="Bạn cần đăng nhập để đánh giá"
+                    disabled
+                  />
+                </div>
+
+                {/* Chọn số sao */}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Đánh giá
+                  </label>
+                  <StarSelector
+                    value={newReview.rating}
+                    onChange={(val) =>
+                      setNewReview((prev) => ({ ...prev, rating: val }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Nhận xét của bạn
+                </label>
+                <textarea
+                  rows="3"
+                  className="w-full border border-orange-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-orange-300 outline-none"
+                  placeholder="Nhận xét của bạn…"
+                  value={newReview.comment}
+                  onChange={(e) =>
+                    setNewReview((prev) => ({
+                      ...prev,
+                      comment: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
               <button
                 disabled={submitting}
-                className={`sm:col-span-3 rounded-xl bg-orange-500 text-white py-2 font-semibold hover:bg-orange-600 active:bg-orange-700 transition ${
+                className={`w-full rounded-xl bg-orange-500 text-white py-2 font-semibold hover:bg-orange-600 active:bg-orange-700 transition ${
                   submitting ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               >
