@@ -1,3 +1,4 @@
+// models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -5,6 +6,7 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
+
     password: {
       type: String,
       required: function () {
@@ -12,20 +14,48 @@ const userSchema = new mongoose.Schema(
         return !this.googleId;
       },
     },
+
     googleId: { type: String },
-    avatar: { type: String },
-    phone: { type: String },
-    address: { type: String },
-    bio: { type: String },
-    company: { type: String },
-    jobTitle: { type: String },
+
+    // Ảnh
+    avatar: { type: String, default: "" },
+    cover: { type: String, default: "" },
+
+    // Thông tin cá nhân
+    phone: { type: String, default: "" },
+    address: { type: String, default: "" },
+    bio: { type: String, default: "" },
+    company: { type: String, default: "" },
+    jobTitle: { type: String, default: "" },
+
+    // Kỹ năng
     skills: { type: [String], default: [] },
-    website: { type: String },
-    facebook: { type: String },
-    linkedin: { type: String },
-    gender: { type: String, enum: ["male","female","other"], default: "other"},
-    birthdate: { type: Date },
+
+    // Website & MXH
+    website: { type: String, default: "" },
+    facebook: { type: String, default: "" },
+    linkedin: { type: String, default: "" },
+    zalo: { type: String, default: "" },
+    github: { type: String, default: "" },
+
+    // Học tập & sở thích
+    goal: { type: String, default: "" },           // Mục tiêu học tập
+    interests: { type: String, default: "" },      // Sở thích
+    learningStyle: { type: String, default: "" },  // Phong cách học
+
+    // Ngày sinh (dùng birthday cho ProfilePage)
     birthday: { type: Date },
+    birthdate: { type: Date }, // nếu chỗ khác đang dùng, giữ lại
+
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      default: "other",
+    },
+
+    // Thống kê đơn giản
+    totalCourses: { type: Number, default: 0 },
+
     role: {
       type: String,
       enum: ["student", "teacher", "admin"],

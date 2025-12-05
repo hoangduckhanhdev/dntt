@@ -5,7 +5,18 @@ const upload = require("../middlewares/upload");
 
 const router = express.Router();
 
+router.use((req, res, next) => {
+  console.log(" [User Route] Hit:", req.method, req.originalUrl);
+  next();
+});
+
 router.get("/profile", protect, getProfile);
-router.put("/profile", protect, upload.fields([{ name: "avatar" }, { name: "cover" }]), updateProfile);
+
+router.put("/profile",protect,upload.fields([
+    { name: "avatar", maxCount: 1 },
+    { name: "cover", maxCount: 1 },
+  ]),
+  updateProfile
+);
 
 module.exports = router;
