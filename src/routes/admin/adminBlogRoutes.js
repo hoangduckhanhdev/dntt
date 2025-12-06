@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
+
+// DÙNG CloudinaryStorage
 const upload = require("../../middlewares/upload");
+
 const { protect, adminOrTeacher } = require("../../middlewares/authMiddleware");
 const {
   getAllBlogs,
@@ -10,13 +13,13 @@ const {
   searchBlogs,
 } = require("../../controllers/admin/adminBlogController");
 
-// 🔍 Tìm kiếm blog (phải đặt trước /:id)
+// Tìm kiếm
 router.get("/search", protect, adminOrTeacher, searchBlogs);
 
-// 📄 Lấy tất cả blog
+// Lấy tất cả blog
 router.get("/", protect, adminOrTeacher, getAllBlogs);
 
-// ➕ Tạo blog mới (có upload thumbnail)
+// Tạo blog (CLOUDINARY UPLOAD)
 router.post(
   "/",
   protect,
@@ -25,7 +28,7 @@ router.post(
   createBlog
 );
 
-// ✏️ Cập nhật blog (có thể đổi thumbnail)
+// Cập nhật blog (CLOUDINARY UPLOAD)
 router.put(
   "/:id",
   protect,
@@ -34,7 +37,7 @@ router.put(
   updateBlog
 );
 
-// ❌ Xóa blog
+// Xóa blog
 router.delete("/:id", protect, adminOrTeacher, deleteBlog);
 
 module.exports = router;
