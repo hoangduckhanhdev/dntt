@@ -16,7 +16,7 @@ export default function Contact() {
 
   useEffect(() => {
     axios
-      // ❌ Cũ: "http://localhost:5000/api/contact"
+
       .get(`${API_URL}/contact`) // ✅ Gọi qua API_URL
       .then((res) => setContact(res.data))
       .catch((err) => console.error("❌ Lỗi tải dữ liệu liên hệ:", err));

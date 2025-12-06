@@ -9,6 +9,27 @@ import {
   deleteBlog,
   searchBlogs,
 } from "../../api/adminBlogApi";
+import { ADMIN_API_URL } from "../../api/config"; // ✅ thêm
+
+// Lấy root server: https://hkcode.onrender.com từ https://hkcode.onrender.com/api/admin
+const API_ROOT = ADMIN_API_URL.replace("/api/admin", "");
+
+// Hàm chuẩn hóa URL thumbnail
+const getBlogThumbUrl = (thumb) => {
+  if (!thumb) return "https://via.placeholder.com/80x80?text=No+Image";
+
+  thumb = thumb.trim();
+
+  // Nếu là link đầy đủ
+  if (thumb.startsWith("http")) return thumb;
+
+  // Nếu lưu dạng "/uploads/xxx" hoặc "uploads/xxx"
+  let path = thumb;
+  if (!path.startsWith("/")) path = "/" + path;
+
+  // 👉 Từ đây trở đi path ví dụ: "/uploads/blogs/abc.jpg" hoặc "/uploads/courses/xxx"
+  return `${API_ROOT}${path}`;
+};
 
 export default function AdminBlogs() {
   const [blogs, setBlogs] = useState([]);
@@ -58,7 +79,13 @@ export default function AdminBlogs() {
   };
 
   const openAddModal = () => {
-    setFormData({ title: "", content: "", category: "Tin tức", tags: [], thumbnail: "" });
+    setFormData({
+      title: "",
+      content: "",
+      category: "Tin tức",
+      tags: [],
+      thumbnail: "",
+    });
     setFile(null);
     setEditingBlog(null);
     setIsModalOpen(true);
@@ -93,6 +120,7 @@ export default function AdminBlogs() {
       data.append("category", formData.category.trim());
       data.append("tags", JSON.stringify(formData.tags));
 
+      // ✅ Chỉ gửi file mới nếu có chọn
       if (file) data.append("thumbnail", file);
 
       if (editingBlog) {
@@ -170,16 +198,30 @@ export default function AdminBlogs() {
                   <td className="px-4 py-2 font-medium">{blog.title}</td>
                   <td className="px-4 py-2">
                     {blog.thumbnail ? (
-                      <img src={blog.thumbnail} alt="thumb" className="w-20 h-12 object-cover rounded" />
-                    ) : "—"}
+                      <img
+                        src={getBlogThumbUrl(blog.thumbnail)}
+                        alt="thumb"
+                        className="w-20 h-12 object-cover rounded"
+                      />
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="px-4 py-2">{blog.category}</td>
-                  <td className="px-4 py-2">{blog.author?.name || "Admin"}</td>
+                  <td className="px-4 py-2">
+                    {blog.author?.name || "Admin"}
+                  </td>
                   <td className="px-4 py-2 flex justify-center gap-2">
-                    <button onClick={() => openEditModal(blog)} className="text-orange-500 hover:text-orange-700">
+                    <button
+                      onClick={() => openEditModal(blog)}
+                      className="text-orange-500 hover:text-orange-700"
+                    >
                       <Edit size={18} />
                     </button>
-                    <button onClick={() => handleDelete(blog._id)} className="text-red-500 hover:text-red-700">
+                    <button
+                      onClick={() => handleDelete(blog._id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
                       <Trash size={18} />
                     </button>
                   </td>
@@ -202,7 +244,9 @@ export default function AdminBlogs() {
                 <input
                   type="text"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
                   className="w-full border border-orange-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
                   placeholder="Nhập tiêu đề"
                 />
@@ -213,7 +257,9 @@ export default function AdminBlogs() {
                 <ReactQuill
                   ref={quillRef}
                   value={formData.content}
-                  onChange={(value) => setFormData({ ...formData, content: value })}
+                  onChange={(value) =>
+                    setFormData({ ...formData, content: value })
+                  }
                   theme="snow"
                 />
               </div>
@@ -223,20 +269,27 @@ export default function AdminBlogs() {
                 <input
                   type="text"
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
                   className="w-full border border-orange-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
               </div>
 
               <div>
-                <label className="block mb-1 font-medium">Tags (phân cách dấu phẩy)</label>
+                <label className="block mb-1 font-medium">
+                  Tags (phân cách dấu phẩy)
+                </label>
                 <input
                   type="text"
                   value={formData.tags.join(",")}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      tags: e.target.value.split(",").map((t) => t.trim()),
+                      tags: e.target.value
+                        .split(",")
+                        .map((t) => t.trim())
+                        .filter(Boolean),
                     })
                   }
                   className="w-full border border-orange-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -252,7 +305,11 @@ export default function AdminBlogs() {
                   className="w-full border border-orange-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
                 {formData.thumbnail && !file && (
-                  <img src={formData.thumbnail} alt="thumb" className="mt-2 w-40 h-24 object-cover rounded" />
+                  <img
+                    src={getBlogThumbUrl(formData.thumbnail)}
+                    alt="thumb"
+                    className="mt-2 w-40 h-24 object-cover rounded"
+                  />
                 )}
               </div>
 
@@ -264,7 +321,10 @@ export default function AdminBlogs() {
                 >
                   Hủy
                 </button>
-                <button type="submit" className="px-4 py-2 bg-orange-400 text-white rounded hover:bg-orange-500 transition">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-orange-400 text-white rounded hover:bg-orange-500 transition"
+                >
                   Lưu
                 </button>
               </div>

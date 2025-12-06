@@ -1,4 +1,4 @@
-// src/components/admin/StatsCard.jsx
+
 import React from "react";
 
 export default function StatsCard({ title, value, accent }) {
