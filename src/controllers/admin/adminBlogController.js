@@ -1,13 +1,10 @@
 const mongoose = require("mongoose");
 const Blog = require("../../models/Blog");
-
-// ========================= LẤY TẤT CẢ BLOG =========================
 exports.getAllBlogs = async (req, res) => {
   try {
     const blogs = await Blog.find()
       .populate("author", "name email")
       .sort({ createdAt: -1 });
-
     res.status(200).json({ success: true, count: blogs.length, data: blogs });
   } catch (error) {
     console.error(error);
@@ -17,8 +14,6 @@ exports.getAllBlogs = async (req, res) => {
     });
   }
 };
-
-// ========================= TẠO BLOG MỚI =========================
 exports.createBlog = async (req, res) => {
   try {
     const { title, content, category, tags } = req.body;
@@ -29,7 +24,6 @@ exports.createBlog = async (req, res) => {
         message: "Tiêu đề và nội dung là bắt buộc",
       });
     }
-
     const blogData = {
       title,
       content,
@@ -37,13 +31,9 @@ exports.createBlog = async (req, res) => {
       tags: typeof tags === "string" ? JSON.parse(tags) : tags || [],
       author: req.user.id,
     };
-
-    // ✅ DÙNG URL CLOUDINARY
     if (req.file) {
-      // CloudinaryStorage gán URL vào path (và thường có cả secure_url)
       blogData.thumbnail = req.file.path || req.file.secure_url;
     }
-
     const blog = await Blog.create(blogData);
     res.status(201).json({ success: true, data: blog });
   } catch (error) {
@@ -61,8 +51,6 @@ exports.createBlog = async (req, res) => {
     });
   }
 };
-
-// ========================= CẬP NHẬT BLOG =========================
 exports.updateBlog = async (req, res) => {
   try {
     const { title, content, category, tags } = req.body;
@@ -72,37 +60,30 @@ exports.updateBlog = async (req, res) => {
         .status(400)
         .json({ success: false, message: "ID blog không hợp lệ" });
     }
-
     if (!title || !content) {
       return res.status(400).json({
         success: false,
         message: "Tiêu đề và nội dung là bắt buộc",
       });
     }
-
     const blogData = {
       title,
       content,
       category: category || "Tin tức",
       tags: typeof tags === "string" ? JSON.parse(tags) : tags || [],
     };
-
-    // ✅ Nếu có thumbnail mới, dùng URL Cloudinary
     if (req.file) {
       blogData.thumbnail = req.file.path || req.file.secure_url;
     }
-
     const blog = await Blog.findByIdAndUpdate(req.params.id, blogData, {
       new: true,
       runValidators: true,
     });
-
     if (!blog) {
       return res
         .status(404)
         .json({ success: false, message: "Blog không tồn tại" });
     }
-
     res.status(200).json({ success: true, data: blog });
   } catch (error) {
     console.error(error);
@@ -113,8 +94,6 @@ exports.updateBlog = async (req, res) => {
     });
   }
 };
-
-// ========================= XÓA BLOG =========================
 exports.deleteBlog = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -140,8 +119,6 @@ exports.deleteBlog = async (req, res) => {
     });
   }
 };
-
-// ========================= TÌM KIẾM BLOG =========================
 exports.searchBlogs = async (req, res) => {
   try {
     const { query } = req.query;
@@ -151,7 +128,6 @@ exports.searchBlogs = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Cần query để tìm kiếm" });
     }
-
     const blogs = await Blog.find({
       $or: [
         { title: { $regex: query, $options: "i" } },

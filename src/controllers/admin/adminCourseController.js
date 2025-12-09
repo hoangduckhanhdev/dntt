@@ -1,29 +1,19 @@
-// controllers/admin/adminCourseController.js
+
 const mongoose = require("mongoose");
 const fs = require("fs");
 const Course = require("../../models/Course");
 const Category = require("../../models/Category");
 const Teacher = require("../../models/Teacher");
-const Question = require("../../models/Question"); // Q&A dùng chung
+const Question = require("../../models/Question"); 
 const cloudinary = require("../../config/cloudinary");
-
-// thêm model lớp học
 const CourseClass = require("../../models/CourseClass");
-
-// các model thêm cho Students + Progress
 const Progress = require("../../models/Progress");
 const RegisterCourse = require("../../models/registerCourse");
 const User = require("../../models/User");
-
-/* ===================== HELPER ===================== */
-
-// tìm Teacher theo user đang đăng nhập
 async function findTeacherForUser(userDoc) {
   if (!userDoc || userDoc.role !== "teacher") return null;
   return Teacher.findOne({ user: userDoc._id });
 }
-
-// đếm tổng số lesson trong 1 khóa
 function countTotalLessons(courseDoc) {
   if (!courseDoc.sections || !Array.isArray(courseDoc.sections)) return 0;
   return courseDoc.sections.reduce(
@@ -31,9 +21,6 @@ function countTotalLessons(courseDoc) {
     0
   );
 }
-
-/* ===================== CRUD COURSE ===================== */
-
 exports.getAllCourses = async (req, res) => {
   try {
     let { page = 1, limit = 10 } = req.query;
@@ -41,8 +28,6 @@ exports.getAllCourses = async (req, res) => {
     limit = parseInt(limit);
 
     const filter = {};
-
-    // Teacher chỉ thấy khóa của mình
     if (req.userDoc.role === "teacher") {
       const teacher = await findTeacherForUser(req.userDoc);
       if (!teacher) {
@@ -53,16 +38,12 @@ exports.getAllCourses = async (req, res) => {
       }
       filter.teacher = teacher._id;
     }
-
     const total = await Course.countDocuments(filter);
-
     const courses = await Course.find(filter)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
-
-    // ===== Map category & teacher name =====
     const categoryIds = [
       ...new Set(
         courses
@@ -94,8 +75,6 @@ exports.getAllCourses = async (req, res) => {
       acc[t._id.toString()] = t.name;
       return acc;
     }, {});
-
-    // ===== Thống kê Q&A cho các khoá đang hiển thị =====
     const courseIds = courses.map((c) => c._id);
     let qnaStatsMap = new Map();
 
@@ -142,9 +121,9 @@ exports.getAllCourses = async (req, res) => {
         rating: course.rating || 0,
         category: categoryName,
         teacher: teacherName,
-        studentsCount: course.students || 0, // 🔢 tổng học viên (nếu có)
+        studentsCount: course.students || 0, 
         qnaTotal: stats.total,
-        qnaUnanswered: stats.unanswered, // 🔴 số câu chưa trả lời – dùng để hiện badge Q&A
+        qnaUnanswered: stats.unanswered, 
         createdAt: course.createdAt,
         updatedAt: course.updatedAt,
       };
@@ -171,8 +150,6 @@ exports.getCourse = async (req, res) => {
 
     if (!course)
       return res.status(404).json({ message: "Không tìm thấy khóa học" });
-
-    // Teacher chỉ xem khóa của mình
     if (req.userDoc.role === "teacher") {
       const teacher = await findTeacherForUser(req.userDoc);
       if (!teacher || course.teacher?._id.toString() !== teacher._id.toString()) {
@@ -207,8 +184,6 @@ exports.createCourse = async (req, res) => {
     const { title, description, teacher: teacherInput, price, category } =
       req.body;
     let imageUrl = "";
-
-    // 1️⃣ Upload ảnh nếu có
     if (req.file) {
       try {
         const result = await cloudinary.uploader.upload(req.file.path, {
@@ -221,8 +196,6 @@ exports.createCourse = async (req, res) => {
         imageUrl = "";
       }
     }
-
-    // 2️⃣ Kiểm tra category tồn tại
     const categoryExists = await Category.findById(category);
     if (!categoryExists)
       return res.status(400).json({ message: "Danh mục không tồn tại" });
@@ -230,14 +203,12 @@ exports.createCourse = async (req, res) => {
     let teacherIdToUse;
 
     if (req.userDoc.role === "admin") {
-      // admin: dùng teacher được gửi từ form
       teacherIdToUse = teacherInput;
 
       const teacherExists = await Teacher.findById(teacherIdToUse);
       if (!teacherExists)
         return res.status(400).json({ message: "Giảng viên không tồn tại" });
     } else if (req.userDoc.role === "teacher") {
-      // teacher: tự động gán cho chính mình, không cho chọn người khác
       const teacher = await findTeacherForUser(req.userDoc);
       if (!teacher) {
         return res.status(403).json({
@@ -251,8 +222,6 @@ exports.createCourse = async (req, res) => {
         .status(403)
         .json({ message: "Bạn không có quyền tạo khóa học" });
     }
-
-    // 3️⃣ Tạo course
     const course = await Course.create({
       title,
       description,
@@ -261,8 +230,6 @@ exports.createCourse = async (req, res) => {
       category,
       image: imageUrl,
     });
-
-    // 4️⃣ Cập nhật teacher.coursesTaught bất đồng bộ
     (async () => {
       try {
         const teacherDoc = await Teacher.findById(teacherIdToUse);
@@ -327,28 +294,21 @@ exports.updateCourse = async (req, res) => {
         });
       }
     }
-
     course.title = req.body.title || course.title;
     course.description = req.body.description || course.description;
     course.price = req.body.price || course.price;
-
-    // admin mới được đổi teacher
     if (req.userDoc.role === "admin" && req.body.teacher) {
       const teacherExists = await Teacher.findById(req.body.teacher);
       if (!teacherExists)
         return res.status(400).json({ message: "Giảng viên không tồn tại" });
       course.teacher = req.body.teacher;
     }
-
-    // cập nhật category nếu có
     if (req.body.category && req.body.category !== "") {
       const categoryExists = await Category.findById(req.body.category);
       if (!categoryExists)
         return res.status(400).json({ message: "Danh mục không tồn tại" });
       course.category = req.body.category;
     }
-
-    // ảnh mới
     if (req.file) {
       try {
         const result = await cloudinary.uploader.upload(req.file.path, {
@@ -383,7 +343,6 @@ exports.deleteCourse = async (req, res) => {
         });
       }
     }
-
     await course.deleteOne();
 
     const teacherObj = await Teacher.findById(course.teacher);
@@ -434,19 +393,12 @@ exports.getDropdowns = async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 };
-
-/* ===================== STUDENTS & PROGRESS ===================== */
-
-// Danh sách học viên của 1 khóa
 exports.getCourseStudents = async (req, res) => {
   try {
     const courseId = req.params.id;
-
     const course = await Course.findById(courseId);
     if (!course)
       return res.status(404).json({ message: "Không tìm thấy khóa học" });
-
-    // Teacher chỉ được xem khóa của mình
     if (req.userDoc.role === "teacher") {
       const teacher = await findTeacherForUser(req.userDoc);
       if (!teacher || course.teacher.toString() !== teacher._id.toString()) {
@@ -455,15 +407,11 @@ exports.getCourseStudents = async (req, res) => {
         });
       }
     }
-
     const totalLessons = countTotalLessons(course);
-
-    // Học viên đã đăng ký / thanh toán (RegisterCourse)
     const regs = await RegisterCourse.find({
       courseId: courseId,
       paymentStatus: "paid",
     }).lean();
-
     const userIds = regs
       .map((r) => r.userId)
       .filter((id) => id && mongoose.isValidObjectId(id));
@@ -488,7 +436,7 @@ exports.getCourseStudents = async (req, res) => {
         phone: r.phone,
         paymentStatus: r.paymentStatus,
         percent: p?.percent || 0,
-        lastLessonId: p?.lastLessonId || null, // 🔁 đồng bộ với schema Progress
+        lastLessonId: p?.lastLessonId || null, 
         updatedAt: p?.updatedAt || r.updatedAt,
       };
     });
@@ -503,8 +451,6 @@ exports.getCourseStudents = async (req, res) => {
     res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
-
-// Tiến độ chi tiết 1 học viên trong khóa
 exports.getStudentProgress = async (req, res) => {
   try {
     const courseId = req.params.id;
@@ -513,8 +459,6 @@ exports.getStudentProgress = async (req, res) => {
     const course = await Course.findById(courseId);
     if (!course)
       return res.status(404).json({ message: "Không tìm thấy khóa học" });
-
-    // check quyền teacher
     if (req.userDoc.role === "teacher") {
       const teacher = await findTeacherForUser(req.userDoc);
       if (!teacher || course.teacher.toString() !== teacher._id.toString()) {
@@ -553,13 +497,10 @@ exports.getStudentProgress = async (req, res) => {
       updatedAt: progress.updatedAt,
     });
   } catch (err) {
-    console.error("❌ Lỗi getStudentProgress:", err);
+    console.error(" Lỗi getStudentProgress:", err);
     res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
-
-/* ===================== CLASSES OF COURSE ===================== */
-// GET /api/admin/courses/:id/classes
 exports.getCourseClasses = async (req, res) => {
   try {
     const courseId = req.params.id;
@@ -568,8 +509,6 @@ exports.getCourseClasses = async (req, res) => {
     if (!course) {
       return res.status(404).json({ message: "Không tìm thấy khóa học" });
     }
-
-    // Teacher chỉ xem lớp của khóa mình dạy
     if (req.userDoc.role === "teacher") {
       const teacher = await findTeacherForUser(req.userDoc);
       if (!teacher || course.teacher.toString() !== teacher._id.toString()) {
@@ -578,24 +517,16 @@ exports.getCourseClasses = async (req, res) => {
           .json({ message: "Bạn không có quyền xem lớp của khoá này" });
       }
     }
-
     const classes = await CourseClass.find({ course: courseId })
       .select("name code semester year")
       .sort({ createdAt: 1 })
       .lean();
-
     return res.json(classes);
   } catch (err) {
-    console.error("❌ Lỗi getCourseClasses:", err);
+    console.error("Lỗi getCourseClasses:", err);
     return res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
-
-/* ===================== Q&A COURSE (ADMIN / TEACHER) ===================== */
-/**
- * GET /api/admin/courses/:id/questions
- * Lấy danh sách câu hỏi Q&A của 1 khoá (cho admin/teacher – nếu còn dùng route này)
- */
 exports.getCourseQuestions = async (req, res) => {
   try {
     const courseId = req.params.id || req.params.courseId;
@@ -607,17 +538,12 @@ exports.getCourseQuestions = async (req, res) => {
 
     return res.json({ success: true, questions });
   } catch (err) {
-    console.error("❌ [ADMIN] getCourseQuestions error:", err);
+    console.error(" [ADMIN] getCourseQuestions error:", err);
     return res
       .status(500)
       .json({ message: "Không tải được danh sách câu hỏi." });
   }
 };
-
-/**
- * POST /api/admin/courses/:id/questions/:questionId/answer
- * Admin / Giảng viên trả lời câu hỏi (nếu còn dùng route admin này)
- */
 exports.answerCourseQuestion = async (req, res) => {
   try {
     const courseId = req.params.id || req.params.courseId;
@@ -634,14 +560,11 @@ exports.answerCourseQuestion = async (req, res) => {
     if (!q) {
       return res.status(404).json({ message: "Không tìm thấy câu hỏi." });
     }
-
-    // đảm bảo câu hỏi thuộc đúng khoá học đang xem
     if (courseId && String(q.course) !== String(courseId)) {
       return res
         .status(400)
         .json({ message: "Câu hỏi không thuộc khoá học này." });
     }
-
     q.answer = answer.trim();
     q.answeredBy = req.user?._id || null;
     q.isResolved = true;
@@ -650,10 +573,9 @@ exports.answerCourseQuestion = async (req, res) => {
     const populated = await q
       .populate("user", "name avatar email")
       .populate("answeredBy", "name");
-
     return res.json({ success: true, question: populated });
   } catch (err) {
-    console.error("❌ [ADMIN] answerCourseQuestion error:", err);
+    console.error("[ADMIN] answerCourseQuestion error:", err);
     return res.status(500).json({ message: "Không thể lưu câu trả lời." });
   }
 };

@@ -13,10 +13,11 @@ const {
   updateSkill,
   deleteSkill,
   reorderSkills,
-  importSkills,        // 👉 thêm controller import
+  importSkills,      // import skills từ file
+  aiSuggestSkills,   // ⭐ NEW: AI gợi ý skill map
 } = require("../../controllers/admin/adminSkillController");
 
-// ========== CRUD ========== 
+// ========== CRUD ==========
 router.get("/skills", getSkills);                // GET  /api/admin/skills
 router.get("/skills/:id", getSkill);             // GET  /api/admin/skills/:id
 router.post("/skills", createSkill);             // POST /api/admin/skills
@@ -34,5 +35,10 @@ router.post(
   upload.single("file"),   // file là field name FE gửi lên
   importSkills
 );
+
+// ========== ⭐ AI SUGGEST SKILL MAP ==========
+// POST /api/admin/skills/ai-suggest
+// Body: { courseId, topic, difficulty, depth, ... }
+router.post("/skills/ai-suggest", aiSuggestSkills);
 
 module.exports = router;
