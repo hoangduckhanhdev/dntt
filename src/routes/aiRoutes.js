@@ -1,1 +1,45 @@
-const express = require("express");const rateLimit = require("express-rate-limit");const {  chat,  gradeEssay,  explainAnswer,  generateQuestionsByAI,   lessonTutor,          } = require("../controllers/aiController");const {  generateSkillMapFromEntryTest,  analyzeLearningPathAfterExam,  getUserSkillProfile,} = require("../controllers/aiAdvisorController");const router = express.Router();const limiter = rateLimit({  windowMs: 60 * 1000,  max: 60,  standardHeaders: true,  legacyHeaders: false,});router.post("/chat", limiter, chat);router.post("/grade-essay", limiter, gradeEssay);router.post("/explain-answer", limiter, explainAnswer);router.post("/generate-questions", limiter, generateQuestionsByAI);router.post("/lesson-tutor", limiter, lessonTutor);router.post(  "/skill-map-from-entry-test",  limiter,  generateSkillMapFromEntryTest);router.post(  "/learning-path-after-exam",  limiter,  analyzeLearningPathAfterExam);router.get("/user-skill-profile", limiter, getUserSkillProfile);module.exports = router;
+const express = require("express");
+const rateLimit = require("express-rate-limit");
+const {
+  chat,
+  gradeEssay,
+  explainAnswer,
+  generateQuestionsByAI,
+  lessonTutor,
+  tts, // ✅ thêm TTS vào đây
+} = require("../controllers/aiController");
+const {
+  generateSkillMapFromEntryTest,
+  analyzeLearningPathAfterExam,
+  getUserSkillProfile,
+} = require("../controllers/aiAdvisorController");
+
+const router = express.Router();
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ===== AI chat / TTS / giải bài =====
+router.post("/chat", limiter, chat);
+router.post("/grade-essay", limiter, gradeEssay);
+router.post("/explain-answer", limiter, explainAnswer);
+router.post("/generate-questions", limiter, generateQuestionsByAI);
+router.post("/lesson-tutor", limiter, lessonTutor);
+router.post("/tts", limiter, tts);
+router.post(
+  "/skill-map-from-entry-test",
+  limiter,
+  generateSkillMapFromEntryTest
+);
+router.post(
+  "/learning-path-after-exam",
+  limiter,
+  analyzeLearningPathAfterExam
+);
+router.get("/user-skill-profile", limiter, getUserSkillProfile);
+
+module.exports = router;
