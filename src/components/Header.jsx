@@ -1,18 +1,14 @@
-// src/components/Header.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { FaBars, FaTimes, FaUserCircle, FaChevronDown } from "react-icons/fa";
 import CartBadge from "./CartBadge";
 import FeedNotificationBell from "./feed/FeedNotificationBell";
-
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const userRef = useRef(null);
   const navigate = useNavigate();
-
-  // Lấy user từ localStorage khi load
   useEffect(() => {
     try {
       const storedUser = JSON.parse(localStorage.getItem("user") || "null");
@@ -21,8 +17,6 @@ export default function Header() {
       setUser(null);
     }
   }, []);
-
-  // Click ngoài menu thì ẩn dropdown user
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (userRef.current && !userRef.current.contains(e.target)) {
@@ -32,8 +26,6 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // Đăng xuất
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -42,8 +34,6 @@ export default function Header() {
     navigate("/");
     window.location.reload();
   };
-
-  // Style cho NavLink active
   const navClass = ({ isActive }) =>
     `nav-link relative py-2 after:absolute after:left-0 after:-bottom-0.5 after:h-[2px] after:rounded-full after:transition-all
      ${
@@ -51,11 +41,10 @@ export default function Header() {
          ? "text-primary after:w-full after:bg-primary"
          : "after:w-0 hover:text-primary hover:after:w-full hover:after:bg-primary"
      }`;
-
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-border">
       <div className="container-page py-3 flex items-center justify-between">
-        {/* LOGO */}
+        {}
         <Link
           to="/"
           className="group inline-flex items-center gap-2 text-2xl font-bold text-dark"
@@ -65,8 +54,7 @@ export default function Header() {
           </span>
           <span className="group-hover:text-primary transition"></span>
         </Link>
-
-        {/* NAV (Desktop) */}
+        {}
         <nav className="hidden md:flex items-center gap-6">
           <NavLink to="/" className={navClass}>
             Trang chủ
@@ -77,12 +65,10 @@ export default function Header() {
           <NavLink to="/my-courses" className={navClass}>
             Khoá học của tôi
           </NavLink>
-
-          {/* Bảng tin học tập */}
+          {}
           <NavLink to="/learn-feed" className={navClass}>
             Bảng tin
           </NavLink>
-
           <NavLink to="/teacher" className={navClass}>
             Giảng viên
           </NavLink>
@@ -96,21 +82,18 @@ export default function Header() {
             Liên hệ
           </NavLink>
         </nav>
-
-        {/* USER + MOBILE TOGGLE */}
+        {}
         <div className="flex items-center gap-3 md:gap-4" ref={userRef}>
-          {/* Cart luôn hiển thị */}
+          {}
           <CartBadge />
-
-          {/* 🔔 Thông báo LearnFeed – chỉ hiển thị khi đã login */}
+          {}
           {user && <FeedNotificationBell />}
-
-          {/* Khu vực tài khoản */}
+          {}
           <div className="relative flex items-center">
-            {/* Khi CHƯA đăng nhập */}
+            {}
             {!user && (
               <>
-                {/* Nút desktop */}
+                {}
                 <button
                   onClick={() => navigate("/login")}
                   className="hidden md:inline-flex btn btn-ghost"
@@ -123,8 +106,7 @@ export default function Header() {
                 >
                   Đăng ký
                 </button>
-
-                {/* Icon avatar cho MOBILE */}
+                {}
                 <button
                   type="button"
                   className="md:hidden text-2xl text-gray-700 hover:text-primary"
@@ -135,8 +117,7 @@ export default function Header() {
                 </button>
               </>
             )}
-
-            {/* Khi ĐÃ đăng nhập */}
+            {}
             {user && (
               <button
                 type="button"
@@ -152,27 +133,23 @@ export default function Header() {
                 ) : (
                   <FaUserCircle className="w-7 h-7 text-gray-600" />
                 )}
-
-                {/* Thông tin ngắn gọn (ẩn trên mobile, hiện trên md trở lên) */}
+                {}
                 <div className="hidden md:flex flex-col items-start leading-tight max-w-[160px]">
                   <span className="text-[11px] text-muted">Tài khoản</span>
                   <span className="text-sm font-semibold text-gray-800 truncate">
                     {user.name}
                   </span>
                 </div>
-
-                {/* mũi tên dropdown – chỉ hiện desktop */}
+                {}
                 <FaChevronDown className="hidden md:block text-xs text-gray-500" />
               </button>
             )}
-
-            {/* Dropdown tài khoản (dùng chung cho cả mobile & desktop) */}
+            {}
             {userMenuOpen && (
               <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border bg-white shadow-soft animate-[fadeIn_0.2s_ease-out] z-50">
-                {/* caret */}
+                {}
                 <div className="absolute -top-2 right-4 h-3 w-3 rotate-45 bg-white border-l border-t border-border"></div>
-
-                {/* Nếu đã login → show info + menu đầy đủ */}
+                {}
                 {user ? (
                   <>
                     <div className="px-4 py-3 border-b border-border">
@@ -183,7 +160,6 @@ export default function Header() {
                         {user.email}
                       </p>
                     </div>
-
                     <button
                       onClick={() => {
                         setUserMenuOpen(false);
@@ -193,7 +169,6 @@ export default function Header() {
                     >
                       Khoá học của tôi
                     </button>
-
                     <button
                       onClick={() => {
                         setUserMenuOpen(false);
@@ -203,7 +178,6 @@ export default function Header() {
                     >
                       Hồ sơ cá nhân
                     </button>
-
                     {user.role === "admin" && (
                       <button
                         onClick={() => {
@@ -215,7 +189,6 @@ export default function Header() {
                         Trang quản trị
                       </button>
                     )}
-
                     <button
                       onClick={handleLogout}
                       className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-b-2xl"
@@ -224,7 +197,6 @@ export default function Header() {
                     </button>
                   </>
                 ) : (
-                  // Nếu chưa login → menu Đăng nhập / Đăng ký (cho mobile)
                   <div className="py-2">
                     <button
                       onClick={() => {
@@ -249,8 +221,7 @@ export default function Header() {
               </div>
             )}
           </div>
-
-          {/* Mobile toggle menu chính */}
+          {}
           <button
             className="md:hidden text-2xl text-dark"
             onClick={() => setMenuOpen((v) => !v)}
@@ -262,8 +233,7 @@ export default function Header() {
           </button>
         </div>
       </div>
-
-      {/* NAV (Mobile) */}
+      {}
       <div
         id="mobile-menu"
         className={`md:hidden border-t border-border bg-white overflow-hidden transition-[max-height] duration-300 ${
@@ -327,8 +297,7 @@ export default function Header() {
           >
             Liên hệ
           </NavLink>
-
-          {/* Nút login/register trong menu mobile vẫn giữ, cho dễ thấy hơn */}
+          {}
           {!user && (
             <div className="mt-2 grid grid-cols-2 gap-3">
               <button

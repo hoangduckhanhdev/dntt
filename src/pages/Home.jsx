@@ -1,4 +1,3 @@
-// src/pages/Home.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -17,8 +16,6 @@ import {
 } from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
 import { API_URL } from "../api/config";
-
-// Helper parse linh hoạt
 const extractArray = (payload, key) => {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
@@ -26,25 +23,16 @@ const extractArray = (payload, key) => {
   if (Array.isArray(payload.data)) return payload.data;
   return [];
 };
-
 export default function Home() {
   const [courses, setCourses] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
-
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
-
   const [testimonials, setTestimonials] = useState([]);
   const [loadingTestimonials, setLoadingTestimonials] = useState(true);
-
   const [blogs, setBlogs] = useState([]);
   const [loadingBlogs, setLoadingBlogs] = useState(true);
-
   const navigate = useNavigate();
-
-  /* ===== Fetch data ===== */
-
-  // Khóa học
   useEffect(() => {
     async function fetchCourses() {
       try {
@@ -59,8 +47,6 @@ export default function Home() {
     }
     fetchCourses();
   }, []);
-
-  // Danh mục
   useEffect(() => {
     async function fetchCategories() {
       try {
@@ -75,8 +61,6 @@ export default function Home() {
     }
     fetchCategories();
   }, []);
-
-  // Testimonials
   useEffect(() => {
     async function fetchTestimonials() {
       try {
@@ -91,8 +75,6 @@ export default function Home() {
     }
     fetchTestimonials();
   }, []);
-
-  // Blog
   useEffect(() => {
     async function fetchBlogs() {
       try {
@@ -107,8 +89,6 @@ export default function Home() {
     }
     fetchBlogs();
   }, []);
-
-  /* ===== Mock hero & stats ===== */
   const heroSlides = [
     {
       img: "https://images.unsplash.com/photo-1529101091764-c3526daf38fe",
@@ -121,9 +101,7 @@ export default function Home() {
       subtitle: "Tự tin xây dựng dự án thực tế ngay từ khóa đầu tiên",
     },
   ];
-
   const stats = { totalCourses: 24, totalInstructors: 8, totalStudents: 1500 };
-
   if (loadingCourses) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -133,10 +111,9 @@ export default function Home() {
       </div>
     );
   }
-
   return (
     <div className="bg-[#fffaf6]">
-      {/* ========== HERO ========== */}
+      {}
       <section className="relative">
         <Swiper
           modules={[Autoplay, Pagination, Navigation]}
@@ -177,9 +154,8 @@ export default function Home() {
           ))}
         </Swiper>
       </section>
-
       <div className="container-page">
-        {/* ========== KHÓA HỌC NỔI BẬT ========== */}
+        {}
         <section className="mt-16">
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-extrabold text-dark inline-flex items-center gap-3">
@@ -195,7 +171,6 @@ export default function Home() {
               </Link>
             </div>
           </div>
-
           <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {courses.map((c, i) => (
               <motion.div
@@ -229,12 +204,10 @@ export default function Home() {
                       </button>
                     </div>
                   </div>
-
                   <div className="card-pad">
                     <h3 className="font-bold text-lg text-dark line-clamp-2 group-hover:text-primary transition-colors duration-200">
                       {c.title}
                     </h3>
-
                     <div className="flex items-center gap-2 mt-2 meta">
                       <img
                         src={
@@ -246,7 +219,6 @@ export default function Home() {
                       />
                       <span>{c.teacher?.name || "Admin"}</span>
                     </div>
-
                     <div className="flex items-center justify-between mt-3 meta">
                       <div className="flex items-center gap-1">
                         <span className="text-yellow-500">⭐</span>
@@ -257,7 +229,6 @@ export default function Home() {
                       </div>
                       <span>{c.students || 520} học viên</span>
                     </div>
-
                     <div className="mt-5 flex items-center justify-between">
                       <span className="price">
                         {typeof c.price === "number"
@@ -273,13 +244,11 @@ export default function Home() {
             ))}
           </div>
         </section>
-
-        {/* ========== DANH MỤC KHÓA HỌC ========== */}
+        {}
         <section className="py-16 bg-gradient-to-b from-white via-primaryLight/40 to-white rounded-2xl mt-16">
           <h2 className="text-3xl font-extrabold text-center text-dark mb-12">
             Danh mục khóa học
           </h2>
-
           {loadingCategories ? (
             <div className="text-center text-muted italic">
               ⏳ Đang tải danh mục...
@@ -328,15 +297,13 @@ export default function Home() {
               ))}
             </div>
           )}
-
           <div className="text-center mt-12">
             <Link to="/categories" className="btn btn-primary px-6 py-2">
               Xem tất cả
             </Link>
           </div>
         </section>
-
-        {/* ========== THỐNG KÊ ========== */}
+        {}
         <section className="mt-14">
           <div className="rounded-2xl text-white p-8 shadow-soft bg-gradient-to-r from-primary to-accent">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
@@ -364,11 +331,9 @@ export default function Home() {
             </div>
           </div>
         </section>
-
-        {/* ========== TESTIMONIALS ========== */}
+        {}
         <section className="mt-14">
           <h2 className="section-title mb-6">⭐ Học viên nói gì?</h2>
-
           {loadingTestimonials ? (
             <div className="text-center text-muted italic">
               ⏳ Đang tải đánh giá...
@@ -401,11 +366,9 @@ export default function Home() {
             </Swiper>
           )}
         </section>
-
-        {/* ========== BLOG ========== */}
+        {}
         <section className="mt-14 mb-24">
           <h2 className="section-title mb-6">📰 Tin tức học tập mới nhất</h2>
-
           {loadingBlogs ? (
             <div className="text-center text-muted italic">
               ⏳ Đang tải blog...
@@ -456,7 +419,6 @@ export default function Home() {
               ))}
             </div>
           )}
-
           <div className="text-center mt-10">
             <Link to="/blog" className="btn btn-primary px-6 py-2">
               Xem tất cả
@@ -464,9 +426,8 @@ export default function Home() {
           </div>
         </section>
       </div>
-
-      {/* ========== CTA cuối trang ========== */}
-      {/* (giữ nguyên đoạn CTA bạn đang có, mình không sửa tiếp) */}
+      {}
+      {}
     </div>
   );
 }

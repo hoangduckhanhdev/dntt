@@ -1,409 +1,1 @@
-// src/pages/StudentExamResult.jsx
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import examApi from "../api/examApi";
-import { API_URL } from "../api/config"; // ✅ sử dụng API_URL chuẩn
-
-export default function StudentExamResult() {
-  const { id } = useParams(); // examId
-  const navigate = useNavigate();
-
-  const [loading, setLoading] = useState(true);
-  const [attempt, setAttempt] = useState(null);
-  const [err, setErr] = useState("");
-
-  // ==== STATE CHO GIẢI THÍCH AI ====
-  const [aiExplainMap, setAiExplainMap] = useState({});
-  const [aiLoadingMap, setAiLoadingMap] = useState({});
-  const [aiErrorMap, setAiErrorMap] = useState({});
-  // ==================================
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setErr("");
-
-        // 🎯 Lấy tất cả các lần làm bài từ API chuẩn
-        const attempts = await examApi.student.getMyAttempts(id);
-
-        if (!attempts || !attempts.length) {
-          setErr("Bạn chưa có lần làm nào cho bài thi này.");
-          setAttempt(null);
-          return;
-        }
-
-        // Lấy lần mới nhất
-        setAttempt(attempts[0]);
-      } catch (e) {
-        console.error(e);
-        const msg =
-          e?.response?.data?.message || "Không tải được kết quả bài thi.";
-        setErr(msg);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [id]);
-
-  // ================================
-  // 🔥 GỌI AI GIẢI THÍCH TỪNG CÂU
-  // ================================
-  const handleExplainAI = async (ans, idx) => {
-    const key = ans._id || idx;
-
-    try {
-      setAiErrorMap((prev) => ({ ...prev, [key]: "" }));
-      setAiLoadingMap((prev) => ({ ...prev, [key]: true }));
-
-      const q = ans.question || {};
-      const type = q.type;
-
-      const allOptions =
-        ans.optionSnapshots?.length > 0
-          ? ans.optionSnapshots
-          : q.options || [];
-
-      const payload = {
-        questionId: q._id,
-        questionContent: ans.questionContent || q.content || "",
-        type,
-        options: allOptions.map((op) => ({
-          id: op.optionId || op._id,
-          text: op.text,
-          isCorrect: !!op.isCorrect,
-        })),
-        studentAnswer: {
-          selectedOptionIds: ans.selectedOptionIds || [],
-          answerText: ans.answerText || "",
-          fileUrl: ans.fileUrl || "",
-        },
-        score: ans.score ?? 0,
-        maxScore: ans.maxScore ?? 0,
-      };
-
-      // 🎯 Gọi API AI qua examApi.student
-      const res = await examApi.student.explainAnswer(payload);
-
-      setAiExplainMap((prev) => ({ ...prev, [key]: res }));
-    } catch (e) {
-      console.error(e);
-      setAiErrorMap((prev) => ({
-        ...prev,
-        [key]:
-          e?.response?.data?.message ||
-          "Không giải thích được, vui lòng thử lại.",
-      }));
-    } finally {
-      setAiLoadingMap((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  // ================================
-  // UI HIỂN THỊ
-  // ================================
-  if (loading) return <div className="p-6">Đang tải kết quả...</div>;
-
-  if (err)
-    return (
-      <div className="max-w-4xl mx-auto p-6">
-        <p className="text-sm text-red-500 mb-2">{err}</p>
-        <button
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 rounded-lg border border-slate-300"
-        >
-          ← Quay lại
-        </button>
-      </div>
-    );
-
-  if (!attempt)
-    return (
-      <div className="p-6 text-sm text-slate-500">
-        Không có dữ liệu bài thi.
-      </div>
-    );
-
-  const exam = attempt.exam || {};
-  const now = new Date();
-  const dueAt = exam.dueAt ? new Date(exam.dueAt) : null;
-
-  const canViewScore =
-    exam.showScoreToStudent !== false && attempt.maxScore > 0;
-
-  const revealMode = exam.revealAnswersMode || "immediately";
-  const canViewAnswers =
-    exam.showCorrectAnswers === true &&
-    revealMode !== "never" &&
-    (revealMode !== "after_due" || (dueAt && now > dueAt));
-
-  const percent =
-    attempt.maxScore > 0
-      ? Math.round((attempt.totalScore / attempt.maxScore) * 100)
-      : 0;
-
-  const totalQuestions = attempt.answers?.length || 0;
-
-  const correctQuestions = attempt.answers?.filter(
-    (a) =>
-      typeof a.score === "number" &&
-      typeof a.maxScore === "number" &&
-      a.maxScore > 0 &&
-      a.score >= a.maxScore
-  ).length;
-
-  const score10 =
-    attempt.maxScore > 0
-      ? ((attempt.totalScore / attempt.maxScore) * 10).toFixed(2)
-      : "0.00";
-
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-xl border shadow-soft p-6">
-        {/* HEADER */}
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">
-              📝 {exam.title}
-            </h1>
-            <p className="text-sm text-slate-500">
-              Lần làm:{" "}
-              <span className="font-semibold">
-                {attempt.attemptIndex || 1}
-              </span>{" "}
-              · Trạng thái:{" "}
-              <span className="font-semibold">
-                {attempt.status === "graded"
-                  ? "Đã chấm"
-                  : attempt.status === "submitted"
-                  ? "Đã nộp"
-                  : attempt.status === "timeout"
-                  ? "Hết giờ"
-                  : "Không rõ"}
-              </span>
-            </p>
-          </div>
-
-          {canViewScore && (
-            <div className="text-right">
-              <div className="text-xs text-slate-500">Điểm tổng</div>
-              <div className="text-xl font-bold text-orange-600">
-                {attempt.totalScore}/{attempt.maxScore}
-              </div>
-              <div className="text-xs text-slate-500">
-                Điểm quy đổi:{" "}
-                <span className="font-semibold">{score10}/10</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* TÓM TẮT */}
-        {canViewScore && (
-          <div className="mb-4 flex gap-3 text-sm">
-            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full">
-              Đúng: {correctQuestions}/{totalQuestions}
-            </span>
-          </div>
-        )}
-
-        {/* KHÔNG CHO XEM ĐIỂM */}
-        {!canViewScore && (
-          <div className="mb-4 p-3 bg-yellow-50 border text-yellow-800 rounded">
-            Giáo viên chưa cho phép xem điểm chi tiết.
-          </div>
-        )}
-
-        {/* ==========================
-              DANH SÁCH CÂU HỎI
-           ========================== */}
-        {canViewScore && (
-          <div className="space-y-4">
-            {attempt.answers.map((ans, idx) => {
-              const q = ans.question || {};
-              const key = ans._id || idx;
-
-              const type = q.type;
-              const isCorrect =
-                ans.score >= ans.maxScore && ans.maxScore > 0;
-
-              const aiExplain = aiExplainMap[key];
-              const aiLoading = aiLoadingMap[key];
-              const aiErr = aiErrorMap[key];
-
-              const allOptions =
-                ans.optionSnapshots?.length > 0
-                  ? ans.optionSnapshots
-                  : q.options || [];
-
-              const selectedIds = ans.selectedOptionIds?.map(String) || [];
-
-              const studentAnswerText =
-                q.type === "multiple_choice"
-                  ? allOptions
-                      .filter((op) =>
-                        selectedIds.includes(
-                          String(op.optionId || op._id)
-                        )
-                      )
-                      .map((op) => op.text)
-                      .join("; ")
-                  : ans.answerText || "";
-
-              // Đáp án đúng
-              let correctText = "";
-              if (canViewAnswers) {
-                if (type === "multiple_choice") {
-                  correctText = (q.options || [])
-                    .filter((op) => op.isCorrect)
-                    .map((op) => op.text)
-                    .join("; ");
-                } else {
-                  correctText = q.correctAnswer || "";
-                }
-              }
-
-              const canExplainByAI = [
-                "multiple_choice",
-                "true_false",
-                "short_answer",
-                "essay",
-              ].includes(type);
-
-              return (
-                <div
-                  key={key}
-                  className="border border-slate-200 rounded-lg p-3 bg-slate-50"
-                >
-                  <div className="flex justify-between">
-                    <div>
-                      <div className="text-xs text-slate-500">
-                        Câu {idx + 1} · {type}
-                      </div>
-                      <div className="text-sm font-semibold">
-                        {q.content}
-                      </div>
-                    </div>
-                    <div className="text-right w-24">
-                      <div
-                        className={
-                          "text-xs font-semibold " +
-                          (isCorrect ? "text-emerald-600" : "text-red-500")
-                        }
-                      >
-                        {isCorrect ? "Đúng" : "Sai"}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {ans.score}/{ans.maxScore}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-xs mt-1">
-                    <b>Trả lời:</b>{" "}
-                    {studentAnswerText || "(Không trả lời)"}
-                  </div>
-
-                  {ans.fileUrl && (
-                    <div className="text-xs mt-1">
-                      <b>File nộp:</b>{" "}
-                      <a
-                        href={ans.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-orange-600 underline"
-                      >
-                        Xem file
-                      </a>
-                    </div>
-                  )}
-
-                  {canViewAnswers && correctText && (
-                    <div className="text-xs text-emerald-700 mt-1">
-                      <b>Đáp án đúng:</b> {correctText}
-                    </div>
-                  )}
-
-                  {/* NÚT AI */}
-                  {canExplainByAI && (
-                    <div className="mt-2">
-                      <button
-                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
-                        disabled={aiLoading}
-                        onClick={() => handleExplainAI(ans, idx)}
-                      >
-                        {aiLoading ? "AI đang phân tích..." : "Giải thích AI"}
-                      </button>
-                      {aiExplain && (
-                        <span className="text-[11px] text-slate-400 ml-2">
-                          (đã phân tích)
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* LỖI AI */}
-                  {aiErr && (
-                    <div className="text-[11px] text-red-500 mt-1">
-                      {aiErr}
-                    </div>
-                  )}
-
-                  {/* KẾT QUẢ AI */}
-                  {aiExplain && (
-                    <div className="mt-2 p-3 border rounded bg-white text-xs space-y-1">
-                      {aiExplain.verdict && (
-                        <div>
-                          <b>Kết luận:</b> {aiExplain.verdict}
-                        </div>
-                      )}
-                      {aiExplain.explanation && (
-                        <div>
-                          <b>Giải thích:</b> {aiExplain.explanation}
-                        </div>
-                      )}
-                      {aiExplain.correctAnswerText && (
-                        <div>
-                          <b>Đáp án đúng (AI):</b>{" "}
-                          {aiExplain.correctAnswerText}
-                        </div>
-                      )}
-                      {aiExplain.reasonCorrect && (
-                        <div>
-                          <b>Vì sao đúng:</b> {aiExplain.reasonCorrect}
-                        </div>
-                      )}
-                      {aiExplain.tip && (
-                        <div>
-                          <b>Gợi ý:</b> {aiExplain.tip}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* NÚT ĐIỀU HƯỚNG */}
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 rounded-lg border text-sm"
-          >
-            ← Quay lại
-          </button>
-          <button
-            onClick={() => navigate("/my-courses")}
-            className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm"
-          >
-            Về khoá học của tôi
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import React, { useEffect, useState } from "react";import { useParams, useNavigate } from "react-router-dom";import examApi from "../api/examApi";import { API_URL } from "../api/config"; export default function StudentExamResult() {  const { id } = useParams();   const navigate = useNavigate();  const [loading, setLoading] = useState(true);  const [attempt, setAttempt] = useState(null);  const [err, setErr] = useState("");  const [aiExplainMap, setAiExplainMap] = useState({});  const [aiLoadingMap, setAiLoadingMap] = useState({});  const [aiErrorMap, setAiErrorMap] = useState({});  useEffect(() => {    const fetchData = async () => {      try {        setLoading(true);        setErr("");        const attempts = await examApi.student.getMyAttempts(id);        if (!attempts || !attempts.length) {          setErr("Bạn chưa có lần làm nào cho bài thi này.");          setAttempt(null);          return;        }        setAttempt(attempts[0]);      } catch (e) {        console.error(e);        const msg =          e?.response?.data?.message || "Không tải được kết quả bài thi.";        setErr(msg);      } finally {        setLoading(false);      }    };    fetchData();  }, [id]);  const handleExplainAI = async (ans, idx) => {    const key = ans._id || idx;    try {      setAiErrorMap((prev) => ({ ...prev, [key]: "" }));      setAiLoadingMap((prev) => ({ ...prev, [key]: true }));      const q = ans.question || {};      const type = q.type;      const allOptions =        ans.optionSnapshots?.length > 0          ? ans.optionSnapshots          : q.options || [];      const payload = {        questionId: q._id,        questionContent: ans.questionContent || q.content || "",        type,        options: allOptions.map((op) => ({          id: op.optionId || op._id,          text: op.text,          isCorrect: !!op.isCorrect,        })),        studentAnswer: {          selectedOptionIds: ans.selectedOptionIds || [],          answerText: ans.answerText || "",          fileUrl: ans.fileUrl || "",        },        score: ans.score ?? 0,        maxScore: ans.maxScore ?? 0,      };      const res = await examApi.student.explainAnswer(payload);      setAiExplainMap((prev) => ({ ...prev, [key]: res }));    } catch (e) {      console.error(e);      setAiErrorMap((prev) => ({        ...prev,        [key]:          e?.response?.data?.message ||          "Không giải thích được, vui lòng thử lại.",      }));    } finally {      setAiLoadingMap((prev) => ({ ...prev, [key]: false }));    }  };  if (loading) return <div className="p-6">Đang tải kết quả...</div>;  if (err)    return (      <div className="max-w-4xl mx-auto p-6">        <p className="text-sm text-red-500 mb-2">{err}</p>        <button          onClick={() => navigate(-1)}          className="px-4 py-2 rounded-lg border border-slate-300"        >          ← Quay lại        </button>      </div>    );  if (!attempt)    return (      <div className="p-6 text-sm text-slate-500">        Không có dữ liệu bài thi.      </div>    );  const exam = attempt.exam || {};  const now = new Date();  const dueAt = exam.dueAt ? new Date(exam.dueAt) : null;  const canViewScore =    exam.showScoreToStudent !== false && attempt.maxScore > 0;  const revealMode = exam.revealAnswersMode || "immediately";  const canViewAnswers =    exam.showCorrectAnswers === true &&    revealMode !== "never" &&    (revealMode !== "after_due" || (dueAt && now > dueAt));  const percent =    attempt.maxScore > 0      ? Math.round((attempt.totalScore / attempt.maxScore) * 100)      : 0;  const totalQuestions = attempt.answers?.length || 0;  const correctQuestions = attempt.answers?.filter(    (a) =>      typeof a.score === "number" &&      typeof a.maxScore === "number" &&      a.maxScore > 0 &&      a.score >= a.maxScore  ).length;  const score10 =    attempt.maxScore > 0      ? ((attempt.totalScore / attempt.maxScore) * 10).toFixed(2)      : "0.00";  return (    <div className="max-w-4xl mx-auto p-6">      <div className="bg-white rounded-xl border shadow-soft p-6">        {}        <div className="flex justify-between items-start mb-4">          <div>            <h1 className="text-2xl font-bold text-slate-800">              📝 {exam.title}            </h1>            <p className="text-sm text-slate-500">              Lần làm:{" "}              <span className="font-semibold">                {attempt.attemptIndex || 1}              </span>{" "}              · Trạng thái:{" "}              <span className="font-semibold">                {attempt.status === "graded"                  ? "Đã chấm"                  : attempt.status === "submitted"                  ? "Đã nộp"                  : attempt.status === "timeout"                  ? "Hết giờ"                  : "Không rõ"}              </span>            </p>          </div>          {canViewScore && (            <div className="text-right">              <div className="text-xs text-slate-500">Điểm tổng</div>              <div className="text-xl font-bold text-orange-600">                {attempt.totalScore}/{attempt.maxScore}              </div>              <div className="text-xs text-slate-500">                Điểm quy đổi:{" "}                <span className="font-semibold">{score10}/10</span>              </div>            </div>          )}        </div>        {}        {canViewScore && (          <div className="mb-4 flex gap-3 text-sm">            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full">              Đúng: {correctQuestions}/{totalQuestions}            </span>          </div>        )}        {}        {!canViewScore && (          <div className="mb-4 p-3 bg-yellow-50 border text-yellow-800 rounded">            Giáo viên chưa cho phép xem điểm chi tiết.          </div>        )}        {}        {canViewScore && (          <div className="space-y-4">            {attempt.answers.map((ans, idx) => {              const q = ans.question || {};              const key = ans._id || idx;              const type = q.type;              const isCorrect =                ans.score >= ans.maxScore && ans.maxScore > 0;              const aiExplain = aiExplainMap[key];              const aiLoading = aiLoadingMap[key];              const aiErr = aiErrorMap[key];              const allOptions =                ans.optionSnapshots?.length > 0                  ? ans.optionSnapshots                  : q.options || [];              const selectedIds = ans.selectedOptionIds?.map(String) || [];              const studentAnswerText =                q.type === "multiple_choice"                  ? allOptions                      .filter((op) =>                        selectedIds.includes(                          String(op.optionId || op._id)                        )                      )                      .map((op) => op.text)                      .join("; ")                  : ans.answerText || "";              let correctText = "";              if (canViewAnswers) {                if (type === "multiple_choice") {                  correctText = (q.options || [])                    .filter((op) => op.isCorrect)                    .map((op) => op.text)                    .join("; ");                } else {                  correctText = q.correctAnswer || "";                }              }              const canExplainByAI = [                "multiple_choice",                "true_false",                "short_answer",                "essay",              ].includes(type);              return (                <div                  key={key}                  className="border border-slate-200 rounded-lg p-3 bg-slate-50"                >                  <div className="flex justify-between">                    <div>                      <div className="text-xs text-slate-500">                        Câu {idx + 1} · {type}                      </div>                      <div className="text-sm font-semibold">                        {q.content}                      </div>                    </div>                    <div className="text-right w-24">                      <div                        className={                          "text-xs font-semibold " +                          (isCorrect ? "text-emerald-600" : "text-red-500")                        }                      >                        {isCorrect ? "Đúng" : "Sai"}                      </div>                      <div className="text-xs text-slate-500">                        {ans.score}/{ans.maxScore}                      </div>                    </div>                  </div>                  <div className="text-xs mt-1">                    <b>Trả lời:</b>{" "}                    {studentAnswerText || "(Không trả lời)"}                  </div>                  {ans.fileUrl && (                    <div className="text-xs mt-1">                      <b>File nộp:</b>{" "}                      <a                        href={ans.fileUrl}                        target="_blank"                        rel="noreferrer"                        className="text-orange-600 underline"                      >                        Xem file                      </a>                    </div>                  )}                  {canViewAnswers && correctText && (                    <div className="text-xs text-emerald-700 mt-1">                      <b>Đáp án đúng:</b> {correctText}                    </div>                  )}                  {}                  {canExplainByAI && (                    <div className="mt-2">                      <button                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"                        disabled={aiLoading}                        onClick={() => handleExplainAI(ans, idx)}                      >                        {aiLoading ? "AI đang phân tích..." : "Giải thích AI"}                      </button>                      {aiExplain && (                        <span className="text-[11px] text-slate-400 ml-2">                          (đã phân tích)                        </span>                      )}                    </div>                  )}                  {}                  {aiErr && (                    <div className="text-[11px] text-red-500 mt-1">                      {aiErr}                    </div>                  )}                  {}                  {aiExplain && (                    <div className="mt-2 p-3 border rounded bg-white text-xs space-y-1">                      {aiExplain.verdict && (                        <div>                          <b>Kết luận:</b> {aiExplain.verdict}                        </div>                      )}                      {aiExplain.explanation && (                        <div>                          <b>Giải thích:</b> {aiExplain.explanation}                        </div>                      )}                      {aiExplain.correctAnswerText && (                        <div>                          <b>Đáp án đúng (AI):</b>{" "}                          {aiExplain.correctAnswerText}                        </div>                      )}                      {aiExplain.reasonCorrect && (                        <div>                          <b>Vì sao đúng:</b> {aiExplain.reasonCorrect}                        </div>                      )}                      {aiExplain.tip && (                        <div>                          <b>Gợi ý:</b> {aiExplain.tip}                        </div>                      )}                    </div>                  )}                </div>              );            })}          </div>        )}        {}        <div className="mt-6 flex justify-end gap-2">          <button            onClick={() => navigate(-1)}            className="px-4 py-2 rounded-lg border text-sm"          >            ← Quay lại          </button>          <button            onClick={() => navigate("/my-courses")}            className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm"          >            Về khoá học của tôi          </button>        </div>      </div>    </div>  );}

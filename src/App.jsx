@@ -1,15 +1,10 @@
-// src/App.jsx
 import React, { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import axios from "axios";
 import { getSocket } from "./hooks/useSocket";
 import { API_URL } from "./api/config";
-
-// Layouts
 import UserLayout from "./layouts/UserLayout";
 import AdminLayout from "./layouts/AdminLayout";
-
-// User pages
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -41,8 +36,7 @@ import LearnFeedPage from "./pages/LearnFeedPage";
 import StudentSkillReport from "./pages/StudentSkillReport";
 import StudyRoomList from "./pages/StudyRoomList";
 import StudyRoomDetail from "./pages/StudyRoomDetail";
-
-// Admin pages
+import CourseSkillMapPage from "./pages/CourseSkillMapPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminCourses from "./pages/admin/AdminCourses";
@@ -61,17 +55,14 @@ import AdminExams from "./pages/admin/AdminExams";
 import AdminExamForm from "./pages/admin/AdminExamForm";
 import StudentExamResult from "./pages/StudentExamResult";
 import AdminFeed from "./pages/admin/AdminFeed";
-import CourseSkillMapPage from "./pages/CourseSkillMapPage";
-import AdminCourseSkillMapEditor from "./pages/admin/AdminCourseSkillMapEditor";
+import AdminCourseSkillMapEditor from "./pages/admin/AdminCourseSkillMapEditor"; 
 import AdminSkillList from "./pages/admin/AdminSkillList";
 import AdminStudyRooms from "./pages/admin/AdminStudyRooms";
 import AdminExamAttempts from "./pages/admin/AdminExamAttempts";
 import AdminExamAttemptDetail from "./pages/admin/AdminExamAttemptDetail";
 import AdminQuestionBank from "./pages/admin/AdminQuestionBank";
 import AdminQuestionForm from "./pages/admin/AdminQuestionForm";
-
 export default function App() {
-  // 🔌 Kết nối socket
   useEffect(() => {
     const socket = getSocket();
     socket.on("connect", () => console.log("Socket connected:", socket.id));
@@ -80,19 +71,13 @@ export default function App() {
     );
     return () => socket.disconnect();
   }, []);
-
-  // 🔐 Nhặt token từ URL (Google login redirect) và lưu vào localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     if (!token) return;
-
-    // Lưu token
     localStorage.setItem("token", token);
-
     (async () => {
       try {
-        // 🟢 Nếu backend có /auth/me thì dùng luôn cho chuẩn
         const res = await axios.get(`${API_URL}/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -104,7 +89,6 @@ export default function App() {
         }
       } catch (err) {
         console.warn("Không gọi được /auth/me, fallback decode JWT:", err);
-        // 🔁 Fallback: tự decode JWT để lấy id + email
         try {
           const parts = token.split(".");
           if (parts.length === 3) {
@@ -119,21 +103,17 @@ export default function App() {
           console.error("Decode token thất bại:", e);
         }
       } finally {
-        // Xoá ?token khỏi URL cho sạch
         const url = new URL(window.location.href);
         url.searchParams.delete("token");
         window.history.replaceState({}, "", url.toString());
-
-        // Reload để Header đọc lại user từ localStorage
         window.location.reload();
       }
     })();
   }, []);
-
   return (
     <div className="bg-gradient-to-b from-orange-50 via-yellow-50 to-white min-h-screen">
       <Routes>
-        {/* USER */}
+        {}
         <Route path="/" element={<UserLayout />}>
           <Route index element={<Home />} />
           <Route path="home" element={<Home />} />
@@ -160,34 +140,33 @@ export default function App() {
           <Route path="register-fail" element={<RegisterFail />} />
           <Route path="register-success" element={<RegisterSuccess />} />
           <Route path="my-courses" element={<MyCourses />} />
+          {}
           <Route
-            path="/courses/:courseId/skill-map"
+            path="courses/:courseId/skill-map"
             element={<CourseSkillMapPage />}
           />
           <Route
-            path="/learning/skill-report"
+            path="learning/skill-report"
             element={<StudentSkillReport />}
           />
-          <Route path="/study-rooms" element={<StudyRoomList />} />
-          <Route path="/study-rooms/:roomId" element={<StudyRoomDetail />} />
-          {/* 🔹 LearnFeed - Bảng tin học tập (dùng UserLayout) */}
+          <Route path="study-rooms" element={<StudyRoomList />} />
+          <Route path="study-rooms/:roomId" element={<StudyRoomDetail />} />
+          {}
           <Route path="learn-feed" element={<LearnFeedPage />} />
-
-          {/* Teacher */}
+          {}
           <Route path="teacher/exams" element={<TeacherExamList />} />
           <Route path="teacher/exams/create" element={<ExamFormCreate />} />
           <Route path="teacher/exams/:id" element={<TeacherExamDetail />} />
-
-          {/* Student exam */}
+          {}
           <Route path="exams/:id/do" element={<StudentExamDo />} />
           <Route path="exams/:id/result" element={<StudentExamResult />} />
           <Route path="learning/:id" element={<CourseLearn />} />
         </Route>
-
-        {/* ADMIN */}
+        {}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
+          {}
           <Route path="courses" element={<AdminCourses />} />
           <Route path="courses/new" element={<AdminCourseForm />} />
           <Route path="courses/edit/:id" element={<AdminCourseForm />} />
@@ -203,24 +182,26 @@ export default function App() {
             path="courses/:id/questions"
             element={<AdminCourseQuestions />}
           />
+          {}
           <Route
-            path="/admin/courses/:courseId/skills"
+            path="courses/:courseId/skills"
             element={<AdminCourseSkillMapEditor />}
           />
-          <Route path="/admin/skills" element={<AdminSkillList />} />
-          {/* Exams */}
+          {}
+          <Route path="skills" element={<AdminSkillList />} />
+          {}
           <Route path="exams" element={<AdminExams />} />
           <Route path="exams/new" element={<AdminExamForm />} />
           <Route path="exams/edit/:id" element={<AdminExamForm />} />
-
-          {/* Exam attempts */}
+          {}
           <Route path="exams/:id/attempts" element={<AdminExamAttempts />} />
           <Route
             path="exams/:id/attempts/:attemptId"
             element={<AdminExamAttemptDetail />}
           />
+          {}
           <Route path="study-rooms" element={<AdminStudyRooms />} />
-
+          {}
           <Route path="exam-questions" element={<AdminQuestionBank />} />
           <Route path="exam-questions/new" element={<AdminQuestionForm />} />
           <Route
@@ -228,7 +209,6 @@ export default function App() {
             element={<AdminQuestionForm />}
           />
           <Route path="feed" element={<AdminFeed />} />
-
           <Route path="categories" element={<AdminCategories />} />
           <Route path="blogs" element={<AdminBlogs />} />
           <Route path="teachers" element={<AdminTeachers />} />

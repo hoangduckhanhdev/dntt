@@ -1,237 +1,1 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
-import { API_URL } from "../api/config"; // ✅ Dùng config chung
-
-export default function TeacherDetail() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-
-  const [teacher, setTeacher] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    const fetchTeacher = async () => {
-      try {
-        setErr("");
-
-        // ✅ API URL dùng từ config — chạy trên điện thoại OK
-        const res = await axios.get(`${API_URL}/teacher/${id}`);
-
-        const data =
-          res.data?.teacher && typeof res.data.teacher === "object"
-            ? res.data.teacher
-            : res.data;
-
-        if (!data || typeof data !== "object") {
-          setErr("Không tìm thấy thông tin giảng viên.");
-        } else {
-          setTeacher(data);
-        }
-      } catch (err) {
-        console.error("Lỗi khi lấy thông tin giảng viên:", err);
-        setErr("Không thể tải dữ liệu giảng viên.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTeacher();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="bg-orange-50/70 min-h-[60vh] flex items-center justify-center">
-        <p className="text-gray-500">Đang tải thông tin giảng viên...</p>
-      </div>
-    );
-  }
-
-  if (err || !teacher) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <p className="text-red-500 mb-3">{err}</p>
-        <button
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-orange-500 text-white rounded-lg"
-        >
-          ← Quay lại
-        </button>
-      </div>
-    );
-  }
-
-  const avatar =
-    teacher.image ||
-    teacher.avatar ||
-    "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
-
-  const rating =
-    typeof teacher.rating === "number" ? teacher.rating.toFixed(1) : "0.0";
-
-  const expertise = teacher.expertise || "Chưa cập nhật chuyên môn";
-  const courseCount = teacher.totalCourses || 0;
-
-  return (
-    <div className="bg-orange-50/70 pb-20">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10">
-
-        {/* QUAY LẠI */}
-        <button
-          onClick={() => navigate(-1)}
-          className="mb-6 text-sm text-orange-500 hover:text-orange-600 inline-flex items-center gap-1"
-        >
-          ← Quay lại
-        </button>
-
-        {/* KHUNG TỔNG */}
-        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-orange-100">
-
-          {/* HEADER */}
-          <div className="relative bg-gradient-to-r from-orange-400 to-amber-300 p-10 text-white text-center">
-
-            {/* Avatar */}
-            <div className="flex justify-center -mt-4 mb-4">
-              <div className="relative">
-                <div className="absolute inset-0 rounded-full bg-white/30 blur-lg"></div>
-                <img
-                  src={avatar}
-                  alt={teacher.name}
-                  onError={(e) =>
-                    (e.target.src =
-                      "https://cdn-icons-png.flaticon.com/512/3135/3135715.png")
-                  }
-                  className="w-40 h-40 rounded-full border-4 border-white shadow-xl object-cover relative"
-                />
-              </div>
-            </div>
-
-            <h1 className="text-3xl sm:text-4xl font-bold">{teacher.name}</h1>
-
-            <p className="text-white/90 text-lg mt-1">
-              {teacher.title || "Giảng viên HKCode"}
-            </p>
-
-            {teacher.bio && (
-              <p className="mt-4 text-white/95 max-w-2xl mx-auto leading-relaxed">
-                {teacher.bio}
-              </p>
-            )}
-
-            {/* Info Badge */}
-            <div className="flex flex-wrap justify-center gap-4 mt-6">
-              <span className="px-5 py-2 bg-white/20 rounded-full font-semibold backdrop-blur-sm">
-                ⭐ {rating} / 5.0
-              </span>
-              <span className="px-5 py-2 bg-white/20 rounded-full font-semibold backdrop-blur-sm">
-                📚 {courseCount} khóa học
-              </span>
-              <span className="px-5 py-2 bg-white/20 rounded-full font-semibold backdrop-blur-sm">
-                🎓 {expertise}
-              </span>
-            </div>
-          </div>
-
-          {/* BODY */}
-          <div className="p-10 space-y-10">
-
-            {/* Giới thiệu */}
-            {teacher.intro && (
-              <section className="border-l-4 border-orange-400 pl-5">
-                <h2 className="text-xl font-semibold text-orange-600 mb-2">
-                  👨‍🏫 Giới thiệu chi tiết
-                </h2>
-                <p className="text-gray-700 leading-relaxed text-justify">
-                  {teacher.intro}
-                </p>
-              </section>
-            )}
-
-            {/* Kinh nghiệm */}
-            {teacher.teachingExperience && (
-              <section className="border-l-4 border-orange-400 pl-5">
-                <h2 className="text-xl font-semibold text-orange-600 mb-2">
-                  💼 Kinh nghiệm giảng dạy
-                </h2>
-                <p className="text-gray-700 leading-relaxed text-justify">
-                  {teacher.teachingExperience}
-                </p>
-              </section>
-            )}
-
-            {/* Phong cách */}
-            {teacher.teachingStyle && (
-              <section className="border-l-4 border-orange-400 pl-5">
-                <h2 className="text-xl font-semibold text-orange-600 mb-2">
-                  🎯 Phong cách giảng dạy
-                </h2>
-                <p className="text-gray-700 leading-relaxed text-justify">
-                  {teacher.teachingStyle}
-                </p>
-              </section>
-            )}
-
-            {/* Thành tựu */}
-            {teacher.achievements?.length > 0 && (
-              <section>
-                <h2 className="text-xl font-semibold text-orange-600 mb-3">
-                  🏆 Thành tựu nổi bật
-                </h2>
-                <ul className="text-gray-700 text-sm sm:text-base divide-y divide-orange-50 border border-orange-100 rounded-xl overflow-hidden">
-                  {teacher.achievements.map((a, i) => (
-                    <li key={i} className="flex items-start gap-2 px-4 py-3 bg-orange-50/30">
-                      <span className="mt-1 text-orange-500">✔</span>
-                      <span>{a}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {/* Liên hệ */}
-            <section className="pt-4 border-t border-orange-100">
-              {teacher.phone && (
-                <p className="text-gray-700 text-base mb-4">
-                  📞 Liên hệ: <span className="font-semibold">{teacher.phone}</span>
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-4">
-                {teacher.registerLink && (
-                  <button
-                    onClick={() => navigate("/registercourse")}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-xl text-sm font-semibold shadow-md"
-                  >
-                    Đăng ký học ngay
-                  </button>
-                )}
-
-                {teacher.zaloLink && (
-                  <a
-                    href={teacher.zaloLink}
-                    target="_blank"
-                    className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-md"
-                  >
-                    💬 Chat Zalo
-                  </a>
-                )}
-
-                {teacher.messengerLink && (
-                  <a
-                    href={teacher.messengerLink}
-                    target="_blank"
-                    className="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-md"
-                  >
-                    💭 Messenger
-                  </a>
-                )}
-              </div>
-            </section>
-
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import React, { useEffect, useState } from "react";import { useParams, useNavigate } from "react-router-dom";import axios from "axios";import { API_URL } from "../api/config"; export default function TeacherDetail() {  const { id } = useParams();  const navigate = useNavigate();  const [teacher, setTeacher] = useState(null);  const [loading, setLoading] = useState(true);  const [err, setErr] = useState("");  useEffect(() => {    const fetchTeacher = async () => {      try {        setErr("");        const res = await axios.get(`${API_URL}/teacher/${id}`);        const data =          res.data?.teacher && typeof res.data.teacher === "object"            ? res.data.teacher            : res.data;        if (!data || typeof data !== "object") {          setErr("Không tìm thấy thông tin giảng viên.");        } else {          setTeacher(data);        }      } catch (err) {        console.error("Lỗi khi lấy thông tin giảng viên:", err);        setErr("Không thể tải dữ liệu giảng viên.");      } finally {        setLoading(false);      }    };    fetchTeacher();  }, [id]);  if (loading) {    return (      <div className="bg-orange-50/70 min-h-[60vh] flex items-center justify-center">        <p className="text-gray-500">Đang tải thông tin giảng viên...</p>      </div>    );  }  if (err || !teacher) {    return (      <div className="min-h-[60vh] flex flex-col items-center justify-center">        <p className="text-red-500 mb-3">{err}</p>        <button          onClick={() => navigate(-1)}          className="px-4 py-2 bg-orange-500 text-white rounded-lg"        >          ← Quay lại        </button>      </div>    );  }  const avatar =    teacher.image ||    teacher.avatar ||    "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";  const rating =    typeof teacher.rating === "number" ? teacher.rating.toFixed(1) : "0.0";  const expertise = teacher.expertise || "Chưa cập nhật chuyên môn";  const courseCount = teacher.totalCourses || 0;  return (    <div className="bg-orange-50/70 pb-20">      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10">        {}        <button          onClick={() => navigate(-1)}          className="mb-6 text-sm text-orange-500 hover:text-orange-600 inline-flex items-center gap-1"        >          ← Quay lại        </button>        {}        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-orange-100">          {}          <div className="relative bg-gradient-to-r from-orange-400 to-amber-300 p-10 text-white text-center">            {}            <div className="flex justify-center -mt-4 mb-4">              <div className="relative">                <div className="absolute inset-0 rounded-full bg-white/30 blur-lg"></div>                <img                  src={avatar}                  alt={teacher.name}                  onError={(e) =>                    (e.target.src =                      "https://cdn-icons-png.flaticon.com/512/3135/3135715.png")                  }                  className="w-40 h-40 rounded-full border-4 border-white shadow-xl object-cover relative"                />              </div>            </div>            <h1 className="text-3xl sm:text-4xl font-bold">{teacher.name}</h1>            <p className="text-white/90 text-lg mt-1">              {teacher.title || "Giảng viên HKCode"}            </p>            {teacher.bio && (              <p className="mt-4 text-white/95 max-w-2xl mx-auto leading-relaxed">                {teacher.bio}              </p>            )}            {}            <div className="flex flex-wrap justify-center gap-4 mt-6">              <span className="px-5 py-2 bg-white/20 rounded-full font-semibold backdrop-blur-sm">                ⭐ {rating} / 5.0              </span>              <span className="px-5 py-2 bg-white/20 rounded-full font-semibold backdrop-blur-sm">                📚 {courseCount} khóa học              </span>              <span className="px-5 py-2 bg-white/20 rounded-full font-semibold backdrop-blur-sm">                🎓 {expertise}              </span>            </div>          </div>          {}          <div className="p-10 space-y-10">            {}            {teacher.intro && (              <section className="border-l-4 border-orange-400 pl-5">                <h2 className="text-xl font-semibold text-orange-600 mb-2">                  👨‍🏫 Giới thiệu chi tiết                </h2>                <p className="text-gray-700 leading-relaxed text-justify">                  {teacher.intro}                </p>              </section>            )}            {}            {teacher.teachingExperience && (              <section className="border-l-4 border-orange-400 pl-5">                <h2 className="text-xl font-semibold text-orange-600 mb-2">                  💼 Kinh nghiệm giảng dạy                </h2>                <p className="text-gray-700 leading-relaxed text-justify">                  {teacher.teachingExperience}                </p>              </section>            )}            {}            {teacher.teachingStyle && (              <section className="border-l-4 border-orange-400 pl-5">                <h2 className="text-xl font-semibold text-orange-600 mb-2">                  🎯 Phong cách giảng dạy                </h2>                <p className="text-gray-700 leading-relaxed text-justify">                  {teacher.teachingStyle}                </p>              </section>            )}            {}            {teacher.achievements?.length > 0 && (              <section>                <h2 className="text-xl font-semibold text-orange-600 mb-3">                  🏆 Thành tựu nổi bật                </h2>                <ul className="text-gray-700 text-sm sm:text-base divide-y divide-orange-50 border border-orange-100 rounded-xl overflow-hidden">                  {teacher.achievements.map((a, i) => (                    <li key={i} className="flex items-start gap-2 px-4 py-3 bg-orange-50/30">                      <span className="mt-1 text-orange-500">✔</span>                      <span>{a}</span>                    </li>                  ))}                </ul>              </section>            )}            {}            <section className="pt-4 border-t border-orange-100">              {teacher.phone && (                <p className="text-gray-700 text-base mb-4">                  📞 Liên hệ: <span className="font-semibold">{teacher.phone}</span>                </p>              )}              <div className="flex flex-wrap gap-4">                {teacher.registerLink && (                  <button                    onClick={() => navigate("/registercourse")}                    className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-xl text-sm font-semibold shadow-md"                  >                    Đăng ký học ngay                  </button>                )}                {teacher.zaloLink && (                  <a                    href={teacher.zaloLink}                    target="_blank"                    className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-md"                  >                    💬 Chat Zalo                  </a>                )}                {teacher.messengerLink && (                  <a                    href={teacher.messengerLink}                    target="_blank"                    className="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-md"                  >                    💭 Messenger                  </a>                )}              </div>            </section>          </div>        </div>      </div>    </div>  );}

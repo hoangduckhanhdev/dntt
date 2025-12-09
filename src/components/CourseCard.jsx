@@ -1,14 +1,11 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-
-/* ========= Helpers ========= */
 function formatCompact(n = 0) {
   const v = Number(n) || 0;
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(v % 1_000_000 ? 1 : 0) + "M";
   if (v >= 1_000) return (v / 1_000).toFixed(v % 1_000 ? 1 : 0) + "K";
   return v.toString();
 }
-
 function Stars({ value = 0 }) {
   const v = Math.max(0, Math.min(5, Number(value) || 0));
   return (
@@ -26,17 +23,8 @@ function Stars({ value = 0 }) {
     </div>
   );
 }
-
-/**
- * CourseCard
- * - Nhận thêm props tuỳ chọn:
- *    onAddToCart?: (course) => void   // gọi khi bấm “Thêm giỏ”
- *    showAddToCart?: boolean          // bật/tắt nút thêm giỏ
- *    liveStudents?: number            // nếu muốn ép số HV (ví dụ vừa thanh toán xong), sẽ ưu tiên hiển thị số này
- */
 export default function CourseCard({ course = {}, onAddToCart, showAddToCart = true, liveStudents }) {
   const navigate = useNavigate();
-
   const {
     _id,
     name,
@@ -44,7 +32,7 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
     image,
     teacher,
     price,
-    oldPrice,              // NOTE: nếu có giá gạch
+    oldPrice,              
     category,
     description,
     rating,
@@ -53,19 +41,15 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
     enrolled,
     duration,
     level,
-    createdAt,            // NOTE: dùng để gắn badge "Mới"
+    createdAt,            
   } = course;
-
   const courseId = _id;
   const courseTitle = title || name || "Khoá học";
   const teacherName = teacher?.name || (typeof teacher === "string" ? teacher : "Đang cập nhật");
-
   const priceNumber = typeof price === "number" ? price : 0;
   const priceText = priceNumber > 0 ? `${priceNumber.toLocaleString("vi-VN")} ₫` : "Miễn phí";
   const oldPriceNumber = typeof oldPrice === "number" ? oldPrice : undefined;
   const hasDiscount = oldPriceNumber && oldPriceNumber > priceNumber;
-
-  // NOTE: ưu tiên liveStudents nếu truyền từ ngoài vào (để số HV “nhảy” ngay)
   const studentCount =
     typeof liveStudents === "number"
       ? liveStudents
@@ -74,17 +58,13 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
       : typeof enrolled === "number"
       ? enrolled
       : 0;
-
   const rateValue =
     typeof rating === "number" ? rating : typeof stars === "number" ? stars : 0;
-
   const isNew =
-    createdAt && Date.now() - new Date(createdAt).getTime() < 1000 * 60 * 60 * 24 * 30; // < 30 ngày
-
+    createdAt && Date.now() - new Date(createdAt).getTime() < 1000 * 60 * 60 * 24 * 30; 
   const goDetail = () => {
     if (courseId) navigate(`/course/${courseId}`);
   };
-
   const handleAddToCart = (e) => {
     e.stopPropagation();
     if (onAddToCart) {
@@ -96,7 +76,6 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
         thumb: image,
       });
     } else {
-      // fallback: tự ghi vào localStorage nếu chưa truyền callback
       try {
         const cart = JSON.parse(localStorage.getItem("cart") || "[]");
         const idx = cart.findIndex((x) => x._id === courseId);
@@ -110,11 +89,10 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
             thumb: image,
           });
         localStorage.setItem("cart", JSON.stringify(cart));
-        window.dispatchEvent(new Event("cartUpdated")); // để badge giỏ nhảy số
+        window.dispatchEvent(new Event("cartUpdated")); 
       } catch {}
     }
   };
-
   return (
     <div
       role="button"
@@ -123,7 +101,7 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
       onKeyDown={(e) => (e.key === "Enter" ? goDetail() : null)}
       className="group relative rounded-2xl bg-white ring-1 ring-orange-100 hover:ring-orange-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
     >
-      {/* Thumbnail */}
+      {}
       <div className="relative">
         <img
           src={image || "https://placehold.co/640x360?text=No+Image"}
@@ -134,15 +112,13 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
             e.currentTarget.src = "https://placehold.co/640x360?text=No+Image";
           }}
         />
-
-        {/* Badge danh mục */}
+        {}
         {(category?.name || category) && (
           <span className="absolute left-3 top-3 rounded-full bg-white/90 text-orange-700 ring-1 ring-orange-200 px-3 py-1 text-[11px] font-medium backdrop-blur">
             {category?.name || category}
           </span>
         )}
-
-        {/* Badge Mới / Bán chạy */}
+        {}
         <div className="absolute right-3 top-3 flex gap-2">
           {isNew && (
             <span className="rounded-full bg-green-600 text-white px-2.5 py-1 text-[11px] font-semibold shadow">
@@ -155,19 +131,15 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
             </span>
           )}
         </div>
-
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/0 via-black/0 to-black/0 group-hover:from-black/[0.03] transition-colors" />
       </div>
-
-      {/* Body */}
+      {}
       <div className="p-4">
         <h3 className="text-base sm:text-lg font-semibold text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors">
           {courseTitle}
         </h3>
-
         <div className="mt-1 text-sm text-gray-500">👨‍🏫 {teacherName}</div>
-
-        {/* Stats row */}
+        {}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Stars value={rateValue} />
           <div className="text-xs text-gray-600">
@@ -180,13 +152,11 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
             </span>
           )}
         </div>
-
-        {/* Description */}
+        {}
         {description && (
           <p className="mt-3 text-sm text-gray-600 line-clamp-2">{description}</p>
         )}
-
-        {/* Price + Actions */}
+        {}
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-baseline gap-2">
             <span className="text-orange-600 font-bold">{priceText}</span>
@@ -196,9 +166,8 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
               </span>
             )}
           </div>
-
           <div className="flex items-center gap-2">
-            {/* Xem chi tiết */}
+            {}
             <Link
               to={`/course/${courseId}`}
               onClick={(e) => e.stopPropagation()}
@@ -206,8 +175,7 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
             >
               Chi tiết
             </Link>
-
-            {/* Đăng ký */}
+            {}
             <Link
               to={`/registercourse/${courseId}`}
               onClick={(e) => e.stopPropagation()}
@@ -215,8 +183,7 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
             >
               Đăng ký
             </Link>
-
-            {/* Thêm giỏ (tuỳ chọn) */}
+            {}
             {showAddToCart && (
               <button
                 onClick={handleAddToCart}
@@ -229,8 +196,7 @@ export default function CourseCard({ course = {}, onAddToCart, showAddToCart = t
           </div>
         </div>
       </div>
-
-      {/* Border glow khi hover */}
+      {}
       <div className="pointer-events-none absolute inset-0 rounded-2xl ring-0 group-hover:ring-2 group-hover:ring-orange-100/80 transition-all" />
     </div>
   );

@@ -1,380 +1,1 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { createPaymentMulti } from "../api/ordersApi"; // POST /api/payments/create-multi
-
-/* ============== helpers ============== */
-const formatVND = (n) => Number(n || 0).toLocaleString("vi-VN") + " ₫";
-
-export default function Cart() {
-  const [cart, setCart] = useState([]);
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [loading, setLoading] = useState(false);
-  const [showCheckout, setShowCheckout] = useState(false);
-  const [buyer, setBuyer] = useState({
-    studentName: "",
-    email: "",
-    phone: "",
-    note: "",
-  });
-
-  const navigate = useNavigate();
-
-  /* ============== cart load/save ============== */
-  const normalizeItem = (it) => ({
-    _id: it._id,
-    title: it.title,
-    price: Number(it.price || 0),
-    qty: Number(it.qty || 1),
-    thumb: it.thumb || it.image || it.thumbnail || "https://placehold.co/160x100?text=Course",
-  });
-
-  const saveCart = (next) => {
-    const cleaned = next.map(normalizeItem);
-    localStorage.setItem("cart", JSON.stringify(cleaned));
-    setCart(cleaned);
-    window.dispatchEvent(new Event("cartUpdated"));
-  };
-
-  const loadCart = () => {
-    try {
-      const raw = JSON.parse(localStorage.getItem("cart") || "[]");
-      const merged = raw
-        .map(normalizeItem)
-        .reduce((acc, it) => {
-          const idx = acc.findIndex((x) => x._id === it._id);
-          if (idx >= 0) acc[idx].qty += it.qty || 1;
-          else acc.push({ ...it });
-          return acc;
-        }, []);
-      setCart(merged);
-    } catch {
-      setCart([]);
-    }
-  };
-
-  useEffect(() => {
-    loadCart();
-    try {
-      const u = JSON.parse(localStorage.getItem("user") || "null");
-      if (u) {
-        setBuyer((b) => ({
-          ...b,
-          studentName: b.studentName || u.name || "",
-          email: b.email || u.email || "",
-        }));
-      }
-    } catch {}
-  }, []);
-
-  /* ============== totals/derived ============== */
-  const cartTotal = cart.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 1), 0);
-
-  const { selectedItems, selectedTotal } = useMemo(() => {
-    const items = cart.filter((it) => selectedIds.has(it._id));
-    const total = items.reduce((s, it) => s + (it.price || 0) * (it.qty || 1), 0);
-    return { selectedItems: items, selectedTotal: total };
-  }, [cart, selectedIds]);
-
-  /* ============== select helpers ============== */
-  const toggleOne = (id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAll = () => {
-    setSelectedIds((prev) => {
-      if (prev.size === cart.length) return new Set();
-      return new Set(cart.map((x) => x._id));
-    });
-  };
-
-  /* ============== item actions ============== */
-  const removeItem = (id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    saveCart(cart.filter((it) => it._id !== id));
-  };
-
-  const incQty = (id) => saveCart(cart.map((it) => (it._id === id ? { ...it, qty: (it.qty || 1) + 1 } : it)));
-  const decQty = (id) =>
-    saveCart(
-      cart
-        .map((it) => (it._id === id ? { ...it, qty: Math.max(1, (it.qty || 1) - 1) } : it))
-        .filter(Boolean)
-    );
-
-  /* ============== checkout flow ============== */
-  const handleCheckoutSelected = () => {
-    const token = localStorage.getItem("token");
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    const userId = user?.id || user?._id;
-
-    if (!token || !userId) {
-      alert("Vui lòng đăng nhập trước khi thanh toán!");
-      navigate("/login?redirect=/cart");
-      return;
-    }
-
-    if (selectedIds.size === 0) {
-      alert("Vui lòng chọn ít nhất 1 khóa học để thanh toán.");
-      return;
-    }
-
-    // 1 khóa → chuyển trang đăng ký riêng (form chi tiết)
-    if (selectedIds.size === 1) {
-      const [onlyId] = Array.from(selectedIds);
-      navigate(`/registercourse/${onlyId}`);
-      return;
-    }
-
-    // >=2 khóa → mở modal xác nhận thông tin
-    setShowCheckout(true);
-  };
-
-  const submitMultiCheckout = async (e) => {
-    e.preventDefault();
-    if (!buyer.studentName || !buyer.email || !buyer.phone) {
-      alert("Vui lòng nhập đầy đủ Họ tên, Email và SĐT.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const payload = {
-        studentName: buyer.studentName,
-        email: buyer.email,
-        phone: buyer.phone,
-        note: buyer.note,
-        items: selectedItems.map((it) => ({
-          courseId: it._id,
-          title: it.title,
-          price: Number(it.price || 0),
-          qty: Number(it.qty || 1),
-        })),
-      };
-
-      const res = await createPaymentMulti(payload);
-      const checkoutUrl = res?.data?.checkoutUrl || res?.checkoutUrl;
-      if (!checkoutUrl) throw new Error("Server không trả về link thanh toán.");
-      window.location.href = checkoutUrl;
-    } catch (err) {
-      console.error("❌ Multi checkout error:", err);
-      alert(err?.message || "Không thể tạo đơn thanh toán.");
-    } finally {
-      setLoading(false);
-      setShowCheckout(false);
-    }
-  };
-
-  /* ============== render ============== */
-  return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">🛒 Giỏ hàng của bạn</h1>
-
-        {cart.length > 0 && (
-          <div className="flex items-center gap-4">
-            <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectedIds.size === cart.length && cart.length > 0}
-                onChange={toggleAll}
-              />
-              <span>Chọn tất cả</span>
-            </label>
-            <button
-              onClick={() => saveCart([])}
-              className="text-sm px-3 py-2 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50"
-            >
-              Xóa tất cả
-            </button>
-          </div>
-        )}
-      </div>
-
-      {cart.length === 0 ? (
-        <div className="rounded-2xl border border-orange-100 bg-orange-50/40 p-6 text-slate-700">
-          Chưa có sản phẩm nào trong giỏ hàng.
-        </div>
-      ) : (
-        <>
-          <div className="divide-y rounded-2xl border border-orange-100 bg-white">
-            {cart.map((item) => (
-              <div
-                key={item._id}
-                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(item._id)}
-                    onChange={() => toggleOne(item._id)}
-                  />
-                  <img
-                    src={item.thumb}
-                    alt={item.title}
-                    className="w-20 h-20 rounded-xl object-cover border border-orange-100"
-                  />
-                  <div>
-                    <p className="font-semibold text-slate-800">{item.title}</p>
-                    <p className="text-sm text-slate-500">{formatVND(item.price)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center rounded-lg border border-orange-200 overflow-hidden">
-                    <button onClick={() => decQty(item._id)} className="px-3 py-1.5 text-slate-700 hover:bg-orange-50">−</button>
-                    <span className="px-4">{item.qty || 1}</span>
-                    <button onClick={() => incQty(item._id)} className="px-3 py-1.5 text-slate-700 hover:bg-orange-50">+</button>
-                  </div>
-                  <div className="min-w-[120px] text-right font-semibold text-orange-700">
-                    {formatVND((item.price || 0) * (item.qty || 1))}
-                  </div>
-                  <button onClick={() => removeItem(item._id)} className="text-sm text-red-600 hover:text-red-700">
-                    Xóa
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="text-slate-600">
-              Đã chọn: <b>{selectedItems.length}</b> •{" "}
-              Tổng đã chọn: <b className="text-orange-700">{formatVND(selectedTotal)}</b>
-            </div>
-
-            <div className="text-right">
-              <div className="text-sm text-slate-500 mb-1">
-                Tổng giỏ hàng: {formatVND(cartTotal)}
-              </div>
-              <button
-                onClick={handleCheckoutSelected}
-                disabled={loading || selectedIds.size === 0}
-                className="mt-2 rounded-xl bg-orange-500 text-white px-5 py-2 font-semibold hover:bg-orange-600 disabled:opacity-60"
-              >
-                {loading ? "Đang xử lý..." : `Thanh toán (${selectedItems.length})`}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ================== MODAL CHECKOUT ================== */}
-      {showCheckout && (
-        <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4">
-          <form onSubmit={submitMultiCheckout} className="bg-white w-full max-w-xl rounded-2xl p-6 shadow-lg">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">Thông tin người mua</h2>
-
-            <label className="block text-sm mb-1 text-slate-600">Họ và tên</label>
-            <input
-              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none"
-              value={buyer.studentName}
-              onChange={(e) => setBuyer({ ...buyer, studentName: e.target.value })}
-              required
-            />
-
-            <label className="block text-sm mb-1 text-slate-600">Email</label>
-            <input
-              type="email"
-              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none"
-              value={buyer.email}
-              onChange={(e) => setBuyer({ ...buyer, email: e.target.value })}
-              required
-            />
-
-            <label className="block text-sm mb-1 text-slate-600">Số điện thoại</label>
-            <input
-              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none"
-              value={buyer.phone}
-              onChange={(e) => setBuyer({ ...buyer, phone: e.target.value })}
-              pattern="^0[0-9]{9,10}$"
-              title="Bắt đầu bằng 0, gồm 10–11 chữ số"
-              required
-            />
-
-            <label className="block text-sm mb-1 text-slate-600">Ghi chú (tùy chọn)</label>
-            <textarea
-              rows={2}
-              className="w-full mb-4 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none resize-none"
-              value={buyer.note}
-              onChange={(e) => setBuyer({ ...buyer, note: e.target.value })}
-            />
-
-            {/* ---- TÓM TẮT ĐƠN HÀNG ---- */}
-            <div className="mb-4 rounded-xl border border-gray-200">
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-t-xl">
-                <p className="font-semibold text-slate-800">Tóm tắt đơn hàng ({selectedItems.length})</p>
-                <span className="text-sm text-slate-500">{formatVND(selectedTotal)}</span>
-              </div>
-
-              <div className="max-h-56 overflow-auto divide-y">
-                {selectedItems.map((it) => (
-                  <div key={it._id} className="flex items-center gap-3 px-4 py-3">
-                    <img
-                      src={it.thumb || "https://placehold.co/80x60?text=Course"}
-                      alt={it.title}
-                      className="w-16 h-12 rounded border object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-slate-800 truncate">{it.title}</div>
-                      <div className="text-sm text-slate-500">
-                        Giá: {formatVND(it.price)} • SL: {it.qty || 1}
-                      </div>
-                    </div>
-                    <div className="text-right font-semibold text-orange-600 min-w-[120px]">
-                      {formatVND((it.price || 0) * (it.qty || 1))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleOne(it._id)}
-                      className="ml-2 text-sm text-red-500 hover:text-red-600"
-                      title="Bỏ khỏi danh sách thanh toán"
-                    >
-                      Bỏ
-                    </button>
-                  </div>
-                ))}
-
-                {selectedItems.length === 0 && (
-                  <div className="px-4 py-6 text-sm text-slate-500">
-                    Chưa chọn khóa nào. Đóng cửa sổ này để chọn lại trong giỏ hàng.
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-b-xl">
-                <span className="text-slate-600">Tổng thanh toán</span>
-                <span className="text-lg font-bold text-orange-600">{formatVND(selectedTotal)}</span>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowCheckout(false)}
-                className="flex-1 rounded-xl border border-gray-300 py-2 hover:bg-gray-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={loading || selectedItems.length === 0}
-                className="flex-1 rounded-xl bg-orange-500 text-white py-2 font-semibold hover:bg-orange-600 disabled:opacity-60"
-              >
-                {loading ? "Đang xử lý..." : "Tiếp tục thanh toán"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
+import React, { useEffect, useMemo, useState } from "react";import { useNavigate } from "react-router-dom";import { createPaymentMulti } from "../api/ordersApi"; const formatVND = (n) => Number(n || 0).toLocaleString("vi-VN") + " ₫";export default function Cart() {  const [cart, setCart] = useState([]);  const [selectedIds, setSelectedIds] = useState(new Set());  const [loading, setLoading] = useState(false);  const [showCheckout, setShowCheckout] = useState(false);  const [buyer, setBuyer] = useState({    studentName: "",    email: "",    phone: "",    note: "",  });  const navigate = useNavigate();  const normalizeItem = (it) => ({    _id: it._id,    title: it.title,    price: Number(it.price || 0),    qty: Number(it.qty || 1),    thumb: it.thumb || it.image || it.thumbnail || "https://placehold.co/160x100?text=Course",  });  const saveCart = (next) => {    const cleaned = next.map(normalizeItem);    localStorage.setItem("cart", JSON.stringify(cleaned));    setCart(cleaned);    window.dispatchEvent(new Event("cartUpdated"));  };  const loadCart = () => {    try {      const raw = JSON.parse(localStorage.getItem("cart") || "[]");      const merged = raw        .map(normalizeItem)        .reduce((acc, it) => {          const idx = acc.findIndex((x) => x._id === it._id);          if (idx >= 0) acc[idx].qty += it.qty || 1;          else acc.push({ ...it });          return acc;        }, []);      setCart(merged);    } catch {      setCart([]);    }  };  useEffect(() => {    loadCart();    try {      const u = JSON.parse(localStorage.getItem("user") || "null");      if (u) {        setBuyer((b) => ({          ...b,          studentName: b.studentName || u.name || "",          email: b.email || u.email || "",        }));      }    } catch {}  }, []);  const cartTotal = cart.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 1), 0);  const { selectedItems, selectedTotal } = useMemo(() => {    const items = cart.filter((it) => selectedIds.has(it._id));    const total = items.reduce((s, it) => s + (it.price || 0) * (it.qty || 1), 0);    return { selectedItems: items, selectedTotal: total };  }, [cart, selectedIds]);  const toggleOne = (id) => {    setSelectedIds((prev) => {      const next = new Set(prev);      if (next.has(id)) next.delete(id);      else next.add(id);      return next;    });  };  const toggleAll = () => {    setSelectedIds((prev) => {      if (prev.size === cart.length) return new Set();      return new Set(cart.map((x) => x._id));    });  };  const removeItem = (id) => {    setSelectedIds((prev) => {      const next = new Set(prev);      next.delete(id);      return next;    });    saveCart(cart.filter((it) => it._id !== id));  };  const incQty = (id) => saveCart(cart.map((it) => (it._id === id ? { ...it, qty: (it.qty || 1) + 1 } : it)));  const decQty = (id) =>    saveCart(      cart        .map((it) => (it._id === id ? { ...it, qty: Math.max(1, (it.qty || 1) - 1) } : it))        .filter(Boolean)    );  const handleCheckoutSelected = () => {    const token = localStorage.getItem("token");    const user = JSON.parse(localStorage.getItem("user") || "null");    const userId = user?.id || user?._id;    if (!token || !userId) {      alert("Vui lòng đăng nhập trước khi thanh toán!");      navigate("/login?redirect=/cart");      return;    }    if (selectedIds.size === 0) {      alert("Vui lòng chọn ít nhất 1 khóa học để thanh toán.");      return;    }    if (selectedIds.size === 1) {      const [onlyId] = Array.from(selectedIds);      navigate(`/registercourse/${onlyId}`);      return;    }    setShowCheckout(true);  };  const submitMultiCheckout = async (e) => {    e.preventDefault();    if (!buyer.studentName || !buyer.email || !buyer.phone) {      alert("Vui lòng nhập đầy đủ Họ tên, Email và SĐT.");      return;    }    try {      setLoading(true);      const payload = {        studentName: buyer.studentName,        email: buyer.email,        phone: buyer.phone,        note: buyer.note,        items: selectedItems.map((it) => ({          courseId: it._id,          title: it.title,          price: Number(it.price || 0),          qty: Number(it.qty || 1),        })),      };      const res = await createPaymentMulti(payload);      const checkoutUrl = res?.data?.checkoutUrl || res?.checkoutUrl;      if (!checkoutUrl) throw new Error("Server không trả về link thanh toán.");      window.location.href = checkoutUrl;    } catch (err) {      console.error("❌ Multi checkout error:", err);      alert(err?.message || "Không thể tạo đơn thanh toán.");    } finally {      setLoading(false);      setShowCheckout(false);    }  };  return (    <div className="max-w-5xl mx-auto px-6 py-8">      <div className="flex items-center justify-between mb-6">        <h1 className="text-2xl font-bold">🛒 Giỏ hàng của bạn</h1>        {cart.length > 0 && (          <div className="flex items-center gap-4">            <label className="inline-flex items-center gap-2 text-sm cursor-pointer">              <input                type="checkbox"                checked={selectedIds.size === cart.length && cart.length > 0}                onChange={toggleAll}              />              <span>Chọn tất cả</span>            </label>            <button              onClick={() => saveCart([])}              className="text-sm px-3 py-2 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50"            >              Xóa tất cả            </button>          </div>        )}      </div>      {cart.length === 0 ? (        <div className="rounded-2xl border border-orange-100 bg-orange-50/40 p-6 text-slate-700">          Chưa có sản phẩm nào trong giỏ hàng.        </div>      ) : (        <>          <div className="divide-y rounded-2xl border border-orange-100 bg-white">            {cart.map((item) => (              <div                key={item._id}                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4"              >                <div className="flex items-center gap-3">                  <input                    type="checkbox"                    checked={selectedIds.has(item._id)}                    onChange={() => toggleOne(item._id)}                  />                  <img                    src={item.thumb}                    alt={item.title}                    className="w-20 h-20 rounded-xl object-cover border border-orange-100"                  />                  <div>                    <p className="font-semibold text-slate-800">{item.title}</p>                    <p className="text-sm text-slate-500">{formatVND(item.price)}</p>                  </div>                </div>                <div className="flex items-center gap-3">                  <div className="flex items-center rounded-lg border border-orange-200 overflow-hidden">                    <button onClick={() => decQty(item._id)} className="px-3 py-1.5 text-slate-700 hover:bg-orange-50">−</button>                    <span className="px-4">{item.qty || 1}</span>                    <button onClick={() => incQty(item._id)} className="px-3 py-1.5 text-slate-700 hover:bg-orange-50">+</button>                  </div>                  <div className="min-w-[120px] text-right font-semibold text-orange-700">                    {formatVND((item.price || 0) * (item.qty || 1))}                  </div>                  <button onClick={() => removeItem(item._id)} className="text-sm text-red-600 hover:text-red-700">                    Xóa                  </button>                </div>              </div>            ))}          </div>          <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">            <div className="text-slate-600">              Đã chọn: <b>{selectedItems.length}</b> •{" "}              Tổng đã chọn: <b className="text-orange-700">{formatVND(selectedTotal)}</b>            </div>            <div className="text-right">              <div className="text-sm text-slate-500 mb-1">                Tổng giỏ hàng: {formatVND(cartTotal)}              </div>              <button                onClick={handleCheckoutSelected}                disabled={loading || selectedIds.size === 0}                className="mt-2 rounded-xl bg-orange-500 text-white px-5 py-2 font-semibold hover:bg-orange-600 disabled:opacity-60"              >                {loading ? "Đang xử lý..." : `Thanh toán (${selectedItems.length})`}              </button>            </div>          </div>        </>      )}      {}      {showCheckout && (        <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4">          <form onSubmit={submitMultiCheckout} className="bg-white w-full max-w-xl rounded-2xl p-6 shadow-lg">            <h2 className="text-lg font-semibold text-slate-800 mb-4">Thông tin người mua</h2>            <label className="block text-sm mb-1 text-slate-600">Họ và tên</label>            <input              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none"              value={buyer.studentName}              onChange={(e) => setBuyer({ ...buyer, studentName: e.target.value })}              required            />            <label className="block text-sm mb-1 text-slate-600">Email</label>            <input              type="email"              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none"              value={buyer.email}              onChange={(e) => setBuyer({ ...buyer, email: e.target.value })}              required            />            <label className="block text-sm mb-1 text-slate-600">Số điện thoại</label>            <input              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none"              value={buyer.phone}              onChange={(e) => setBuyer({ ...buyer, phone: e.target.value })}              pattern="^0[0-9]{9,10}$"              title="Bắt đầu bằng 0, gồm 10–11 chữ số"              required            />            <label className="block text-sm mb-1 text-slate-600">Ghi chú (tùy chọn)</label>            <textarea              rows={2}              className="w-full mb-4 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none resize-none"              value={buyer.note}              onChange={(e) => setBuyer({ ...buyer, note: e.target.value })}            />            {}            <div className="mb-4 rounded-xl border border-gray-200">              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-t-xl">                <p className="font-semibold text-slate-800">Tóm tắt đơn hàng ({selectedItems.length})</p>                <span className="text-sm text-slate-500">{formatVND(selectedTotal)}</span>              </div>              <div className="max-h-56 overflow-auto divide-y">                {selectedItems.map((it) => (                  <div key={it._id} className="flex items-center gap-3 px-4 py-3">                    <img                      src={it.thumb || "https://placehold.co/80x60?text=Course"}                      alt={it.title}                      className="w-16 h-12 rounded border object-cover"                    />                    <div className="flex-1 min-w-0">                      <div className="font-medium text-slate-800 truncate">{it.title}</div>                      <div className="text-sm text-slate-500">                        Giá: {formatVND(it.price)} • SL: {it.qty || 1}                      </div>                    </div>                    <div className="text-right font-semibold text-orange-600 min-w-[120px]">                      {formatVND((it.price || 0) * (it.qty || 1))}                    </div>                    <button                      type="button"                      onClick={() => toggleOne(it._id)}                      className="ml-2 text-sm text-red-500 hover:text-red-600"                      title="Bỏ khỏi danh sách thanh toán"                    >                      Bỏ                    </button>                  </div>                ))}                {selectedItems.length === 0 && (                  <div className="px-4 py-6 text-sm text-slate-500">                    Chưa chọn khóa nào. Đóng cửa sổ này để chọn lại trong giỏ hàng.                  </div>                )}              </div>              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-b-xl">                <span className="text-slate-600">Tổng thanh toán</span>                <span className="text-lg font-bold text-orange-600">{formatVND(selectedTotal)}</span>              </div>            </div>            <div className="flex gap-3">              <button                type="button"                onClick={() => setShowCheckout(false)}                className="flex-1 rounded-xl border border-gray-300 py-2 hover:bg-gray-50"              >                Hủy              </button>              <button                type="submit"                disabled={loading || selectedItems.length === 0}                className="flex-1 rounded-xl bg-orange-500 text-white py-2 font-semibold hover:bg-orange-600 disabled:opacity-60"              >                {loading ? "Đang xử lý..." : "Tiếp tục thanh toán"}              </button>            </div>          </form>        </div>      )}    </div>  );}

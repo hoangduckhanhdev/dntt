@@ -1,4 +1,3 @@
-// src/pages/admin/AdminDashboard.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -21,13 +20,9 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-
-/* ================= helpers ================= */
 const currency = (n) => `${Number(n || 0).toLocaleString("vi-VN")}₫`;
-
-/* ================= page ================= */
 export default function AdminDashboard() {
-  const [role, setRole] = useState(null); // "admin" | "teacher"
+  const [role, setRole] = useState(null); 
   const [stats, setStats] = useState({
     users: 0,
     teachers: 0,
@@ -39,36 +34,28 @@ export default function AdminDashboard() {
   });
   const [userChart, setUserChart] = useState([]);
   const [revenueDaily, setRevenueDaily] = useState([]);
-
-  // Dữ liệu dành riêng cho giáo viên
   const [teacherStats, setTeacherStats] = useState({
     teacherName: "",
     totalMyCourses: 0,
     totalMyStudents: 0,
     latestCourses: [],
   });
-
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const navigate = useNavigate();
-
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem("user"));
     const r = u?.role || null;
     setRole(r);
-
     (async () => {
       if (!r) {
         setErr("Bạn chưa đăng nhập hoặc thiếu thông tin quyền.");
         setLoading(false);
         return;
       }
-
       try {
         const token = localStorage.getItem("token");
-
         if (r === "admin") {
-          // 🔸 ADMIN: dùng dashboard cũ (có doanh thu)
           const { data } = await axios.get(
             "http://localhost:5000/api/admin/dashboard",
             { headers: { Authorization: `Bearer ${token}` } }
@@ -91,7 +78,6 @@ export default function AdminDashboard() {
           setUserChart(charts.userStats || []);
           setRevenueDaily(charts.revenueDaily || []);
         } else if (r === "teacher") {
-          // ⭐ TEACHER: dùng dashboard riêng, KHÔNG có doanh thu
           const { data } = await axios.get(
             "http://localhost:5000/api/admin/dashboard/teacher",
             { headers: { Authorization: `Bearer ${token}` } }
@@ -119,7 +105,6 @@ export default function AdminDashboard() {
       }
     })();
   }, []);
-
   if (loading) {
     return (
       <div className="p-8">
@@ -133,7 +118,6 @@ export default function AdminDashboard() {
       </div>
     );
   }
-
   if (err) {
     return (
       <div className="p-8">
@@ -143,12 +127,10 @@ export default function AdminDashboard() {
       </div>
     );
   }
-
-  /* ============= VIEW ADMIN (CÓ DOANH THU) ============= */
   if (role === "admin") {
     return (
       <div className="p-6 lg:p-8 space-y-8">
-        {/* header */}
+        {}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-slate-500">Trang quản trị</p>
@@ -163,8 +145,7 @@ export default function AdminDashboard() {
             Đơn hàng gần đây <ArrowRight size={16} />
           </button>
         </div>
-
-        {/* stat cards */}
+        {}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-5">
           <StatCard
             title="Người dùng"
@@ -206,13 +187,11 @@ export default function AdminDashboard() {
             onClick={() => navigate("/admin/orders")}
           />
         </div>
-
-        {/* charts */}
+        {}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <Panel title="Người dùng mới theo tháng">
             <UsersBarPretty data={userChart} />
           </Panel>
-
           <Panel
             title="Doanh thu theo ngày (7 ngày gần nhất)"
             right={
@@ -230,14 +209,11 @@ export default function AdminDashboard() {
       </div>
     );
   }
-
-  /* ============= VIEW TEACHER (KHÔNG DOANH THU) ============= */
   if (role === "teacher") {
     const t = teacherStats;
-
     return (
       <div className="p-6 lg:p-8 space-y-8">
-        {/* header */}
+        {}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-slate-500">Trang giảng viên</p>
@@ -250,8 +226,7 @@ export default function AdminDashboard() {
             </p>
           </div>
         </div>
-
-        {/* stat cards teacher */}
+        {}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <StatCard
             title="Khóa học đang dạy"
@@ -274,8 +249,7 @@ export default function AdminDashboard() {
             onClick={() => navigate("/admin/notifications")}
           />
         </div>
-
-        {/* bảng khóa học gần đây */}
+        {}
         <Panel title="Khóa học gần đây">
           {(!t.latestCourses || t.latestCourses.length === 0) ? (
             <div className="text-sm text-slate-500 italic">
@@ -314,11 +288,8 @@ export default function AdminDashboard() {
       </div>
     );
   }
-
   return null;
 }
-
-/* ================= ui blocks ================= */
 function StatCard({ title, value, sub, icon, gradient, onClick }) {
   return (
     <button
@@ -342,7 +313,6 @@ function StatCard({ title, value, sub, icon, gradient, onClick }) {
     </button>
   );
 }
-
 function Panel({ title, right, children }) {
   return (
     <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
@@ -354,7 +324,6 @@ function Panel({ title, right, children }) {
     </div>
   );
 }
-
 function EmptyChart() {
   return (
     <div className="h-[320px] grid place-items-center rounded-xl border border-dashed border-orange-200 bg-orange-50/30 text-slate-500">
@@ -365,8 +334,6 @@ function EmptyChart() {
     </div>
   );
 }
-
-/* ================= pretty charts ================= */
 function PrettyTooltip({ active, payload, label, money = false }) {
   if (!active || !payload?.length) return null;
   const val = payload[0].value || 0;
@@ -379,7 +346,6 @@ function PrettyTooltip({ active, payload, label, money = false }) {
     </div>
   );
 }
-
 function UsersBarPretty({ data }) {
   if (!data?.length) return <EmptyChart />;
   return (
@@ -400,7 +366,6 @@ function UsersBarPretty({ data }) {
     </ResponsiveContainer>
   );
 }
-
 function RevenueAreaPretty({ data }) {
   if (!data?.length) return <EmptyChart />;
   return (

@@ -1,62 +1,1 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
-
-export default function ThankYou() {
-  const { search } = useLocation();
-  const params = new URLSearchParams(search);
-
-  // Lấy orderId từ URL: ?order=123
-  const orderId = params.get("order");
-
-  return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4 bg-orange-50/50">
-      <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-orange-100">
-
-        {/* Icon */}
-        <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-green-100 flex items-center justify-center shadow-sm">
-          <span className="text-3xl">✅</span>
-        </div>
-
-        {/* Tiêu đề */}
-        <h1 className="text-2xl font-bold text-slate-800">
-          Đặt hàng thành công!
-        </h1>
-
-        <p className="text-slate-600 mt-2">
-          Cảm ơn bạn đã tin tưởng và đặt hàng tại HKCode Shop.
-        </p>
-
-        {/* Hiển thị mã đơn nếu có */}
-        {orderId && (
-          <p className="mt-2 text-sm text-slate-500">
-            Mã đơn hàng của bạn:{" "}
-            <b className="text-slate-800">{orderId}</b>
-          </p>
-        )}
-
-        {/* Nút điều hướng */}
-        <div className="mt-6 flex gap-3 justify-center">
-          {orderId && (
-            <Link
-              to={`/orders/${orderId}`}
-              className="px-4 py-2 rounded-xl border border-orange-200 text-orange-600 hover:bg-orange-50 transition"
-            >
-              Xem chi tiết đơn
-            </Link>
-          )}
-
-          <Link
-            to="/"
-            className="px-4 py-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 shadow-sm transition"
-          >
-            Về trang chủ
-          </Link>
-        </div>
-
-        <p className="text-xs text-slate-400 mt-6">
-          Nếu cần hỗ trợ, bạn có thể liên hệ fanpage hoặc email hỗ trợ trên website.
-        </p>
-      </div>
-    </div>
-  );
-}
+import React from "react";import { Link, useLocation } from "react-router-dom";export default function ThankYou() {  const { search } = useLocation();  const params = new URLSearchParams(search);  const orderId = params.get("order");  return (    <div className="min-h-[60vh] flex items-center justify-center px-4 bg-orange-50/50">      <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-orange-100">        {}        <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-green-100 flex items-center justify-center shadow-sm">          <span className="text-3xl">✅</span>        </div>        {}        <h1 className="text-2xl font-bold text-slate-800">          Đặt hàng thành công!        </h1>        <p className="text-slate-600 mt-2">          Cảm ơn bạn đã tin tưởng và đặt hàng tại HKCode Shop.        </p>        {}        {orderId && (          <p className="mt-2 text-sm text-slate-500">            Mã đơn hàng của bạn:{" "}            <b className="text-slate-800">{orderId}</b>          </p>        )}        {}        <div className="mt-6 flex gap-3 justify-center">          {orderId && (            <Link              to={`/orders/${orderId}`}              className="px-4 py-2 rounded-xl border border-orange-200 text-orange-600 hover:bg-orange-50 transition"            >              Xem chi tiết đơn            </Link>          )}          <Link            to="/"            className="px-4 py-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 shadow-sm transition"          >            Về trang chủ          </Link>        </div>        <p className="text-xs text-slate-400 mt-6">          Nếu cần hỗ trợ, bạn có thể liên hệ fanpage hoặc email hỗ trợ trên website.        </p>      </div>    </div>  );}

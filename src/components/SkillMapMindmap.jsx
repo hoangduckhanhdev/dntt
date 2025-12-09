@@ -1,139 +1,1 @@
-// src/components/SkillMapMindmap.jsx
-import React, { useMemo } from "react";
-
-/**
- * props:
- * - skills: array skill từ backend
- *   [{ _id, name, description, parentSkill, level, order }]
- * - aiData: {
- *     skillLevels: { [skillName]: 'beginner'|'intermediate'|'advanced' },
- *     recommendedPath: string[]
- *   }
- */
-export default function SkillMapMindmap({ skills = [], aiData }) {
-  const { skillLevels = {}, recommendedPath = [] } = aiData || {};
-
-  // build tree từ parentSkill
-  const tree = useMemo(() => {
-    const map = {};
-    skills.forEach((s) => {
-      map[s._id] = { ...s, children: [] };
-    });
-
-    const roots = [];
-    skills.forEach((s) => {
-      if (s.parentSkill) {
-        const parent = map[s.parentSkill];
-        if (parent) parent.children.push(map[s._id]);
-        else roots.push(map[s._id]); // fallback: không tìm thấy parent
-      } else {
-        roots.push(map[s._id]);
-      }
-    });
-
-    // sort theo order cho đẹp
-    const sortTree = (nodes) => {
-      nodes.sort((a, b) => (a.order || 0) - (b.order || 0));
-      nodes.forEach((n) => sortTree(n.children));
-    };
-    sortTree(roots);
-
-    return roots;
-  }, [skills]);
-
-  const getLevelColor = (level) => {
-    switch (level) {
-      case "advanced":
-        return "border-purple-500 bg-purple-50 text-purple-800";
-      case "intermediate":
-        return "border-blue-400 bg-blue-50 text-blue-800";
-      case "beginner":
-      default:
-        return "border-emerald-400 bg-emerald-50 text-emerald-800";
-    }
-  };
-
-  const getAiLevelBadge = (skillName) => {
-    const aiLevel = skillLevels[skillName];
-    if (!aiLevel) return null;
-    return (
-      <span className="ml-1 text-[10px] px-2 py-[2px] rounded-full bg-orange-100 text-orange-700">
-        AI: {aiLevel}
-      </span>
-    );
-  };
-
-  const isInRecommendedPath = (skillName) =>
-    Array.isArray(recommendedPath) && recommendedPath.includes(skillName);
-
-  const SkillNode = ({ node }) => {
-    const baseColor = getLevelColor(node.level);
-    const isRecommended = isInRecommendedPath(node.name);
-
-    return (
-      <div className="flex flex-col items-center">
-        <div className="relative">
-          <div
-            className={[
-              "px-3 py-2 rounded-xl border shadow-sm text-xs max-w-[220px] text-center cursor-pointer transition-transform hover:-translate-y-1 hover:shadow-md",
-              baseColor,
-              isRecommended ? "ring-2 ring-orange-400" : "",
-            ].join(" ")}
-          >
-            <div className="font-semibold flex items-center justify-center flex-wrap gap-1">
-              <span>{node.name}</span>
-              {getAiLevelBadge(node.name)}
-            </div>
-            {node.description && (
-              <p className="mt-1 text-[11px] opacity-80">
-                {node.description}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {node.children && node.children.length > 0 && (
-          <div className="mt-4">
-            {/* đường nối xuống dưới */}
-            <div className="flex justify-center mb-2">
-              <div className="w-[2px] h-4 bg-slate-300" />
-            </div>
-            {/* nhánh con */}
-            <div className="flex flex-wrap gap-6 justify-center">
-              {node.children.map((child) => (
-                <div key={child._id} className="flex flex-col items-center">
-                  {/* đường ngang + dọc */}
-                  <div className="flex items-center mb-2">
-                    <div className="w-6 h-[2px] bg-slate-300" />
-                    <div className="w-[2px] h-4 bg-slate-300" />
-                  </div>
-                  <SkillNode node={child} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  if (!skills.length) {
-    return (
-      <div className="p-4 text-sm text-gray-500">
-        Chưa có dữ liệu kỹ năng cho khoá học này.
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full overflow-x-auto pb-4">
-      <div className="min-w-[720px]">
-        <div className="flex flex-col items-center gap-8">
-          {tree.map((root) => (
-            <SkillNode key={root._id} node={root} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+import React, { useMemo } from "react";export default function SkillMapMindmap({ skills = [], aiData }) {  const { skillLevels = {}, recommendedPath = [] } = aiData || {};  const tree = useMemo(() => {    const map = {};    skills.forEach((s) => {      map[s._id] = { ...s, children: [] };    });    const roots = [];    skills.forEach((s) => {      if (s.parentSkill) {        const parent = map[s.parentSkill];        if (parent) parent.children.push(map[s._id]);        else roots.push(map[s._id]);       } else {        roots.push(map[s._id]);      }    });    const sortTree = (nodes) => {      nodes.sort((a, b) => (a.order || 0) - (b.order || 0));      nodes.forEach((n) => sortTree(n.children));    };    sortTree(roots);    return roots;  }, [skills]);  const getLevelColor = (level) => {    switch (level) {      case "advanced":        return "border-purple-500 bg-purple-50 text-purple-800";      case "intermediate":        return "border-blue-400 bg-blue-50 text-blue-800";      case "beginner":      default:        return "border-emerald-400 bg-emerald-50 text-emerald-800";    }  };  const getAiLevelBadge = (skillName) => {    const aiLevel = skillLevels[skillName];    if (!aiLevel) return null;    return (      <span className="ml-1 text-[10px] px-2 py-[2px] rounded-full bg-orange-100 text-orange-700">        AI: {aiLevel}      </span>    );  };  const isInRecommendedPath = (skillName) =>    Array.isArray(recommendedPath) && recommendedPath.includes(skillName);  const SkillNode = ({ node }) => {    const baseColor = getLevelColor(node.level);    const isRecommended = isInRecommendedPath(node.name);    return (      <div className="flex flex-col items-center">        <div className="relative">          <div            className={[              "px-3 py-2 rounded-xl border shadow-sm text-xs max-w-[220px] text-center cursor-pointer transition-transform hover:-translate-y-1 hover:shadow-md",              baseColor,              isRecommended ? "ring-2 ring-orange-400" : "",            ].join(" ")}          >            <div className="font-semibold flex items-center justify-center flex-wrap gap-1">              <span>{node.name}</span>              {getAiLevelBadge(node.name)}            </div>            {node.description && (              <p className="mt-1 text-[11px] opacity-80">                {node.description}              </p>            )}          </div>        </div>        {node.children && node.children.length > 0 && (          <div className="mt-4">            {}            <div className="flex justify-center mb-2">              <div className="w-[2px] h-4 bg-slate-300" />            </div>            {}            <div className="flex flex-wrap gap-6 justify-center">              {node.children.map((child) => (                <div key={child._id} className="flex flex-col items-center">                  {}                  <div className="flex items-center mb-2">                    <div className="w-6 h-[2px] bg-slate-300" />                    <div className="w-[2px] h-4 bg-slate-300" />                  </div>                  <SkillNode node={child} />                </div>              ))}            </div>          </div>        )}      </div>    );  };  if (!skills.length) {    return (      <div className="p-4 text-sm text-gray-500">        Chưa có dữ liệu kỹ năng cho khoá học này.      </div>    );  }  return (    <div className="w-full overflow-x-auto pb-4">      <div className="min-w-[720px]">        <div className="flex flex-col items-center gap-8">          {tree.map((root) => (            <SkillNode key={root._id} node={root} />          ))}        </div>      </div>    </div>  );}

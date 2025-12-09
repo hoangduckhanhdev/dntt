@@ -1,41 +1,31 @@
-// src/pages/CourseDetail.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { AiFillStar } from "react-icons/ai";
-import { API_URL } from "../api/config"; // ✅ dùng config chung
-
-/* =========================
-   Helpers
-========================= */
+import { API_URL } from "../api/config"; 
 const extractYouTubeId = (input = "") => {
   if (!input) return "";
   try {
     const url = new URL(input);
     const host = url.hostname.replace(/^m\./, "");
-
     if (host.includes("youtu.be")) {
       const id = url.pathname.split("/").filter(Boolean)[0] || "";
       return id;
     }
     const v = url.searchParams.get("v");
     if (v) return v;
-
     const m = url.pathname.match(/\/(embed|shorts|live|v)\/([^/?#]+)/i);
     if (m?.[2]) return m[2];
-
     return "";
   } catch {
     return (input || "").split(/[?#&]/)[0];
   }
 };
-
 const toYouTubeEmbed = (input = "") => {
   const raw = extractYouTubeId(input);
   const id = (raw || "").replace(/[^a-zA-Z0-9_-]/g, "");
   return id ? `https://www.youtube-nocookie.com/embed/${id}` : "";
 };
-
 const Stars = ({ value = 0, size = 18, className = "" }) => {
   const v = Math.max(0, Math.min(5, Number(value) || 0));
   return (
@@ -51,15 +41,10 @@ const Stars = ({ value = 0, size = 18, className = "" }) => {
     </div>
   );
 };
-
-/* =========================
-   Star selector để gửi đánh giá
-========================= */
 const StarSelector = ({ value = 5, onChange }) => {
   const [hover, setHover] = useState(0);
   const stars = [1, 2, 3, 4, 5];
   const active = hover || value;
-
   return (
     <div className="flex items-center gap-1">
       {stars.map((s) => (
@@ -80,10 +65,6 @@ const StarSelector = ({ value = 5, onChange }) => {
     </div>
   );
 };
-
-/* =========================
-   Lấy user hiện tại từ localStorage
-========================= */
 const getCurrentUser = () => {
   try {
     const raw = localStorage.getItem("user");
@@ -92,39 +73,27 @@ const getCurrentUser = () => {
     return null;
   }
 };
-
-/* =========================
-   Page
-========================= */
 export default function CourseDetail() {
-  const { id } = useParams(); // course id từ /course/:id
+  const { id } = useParams(); 
   const navigate = useNavigate();
-
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-
   const [newReview, setNewReview] = useState({
     rating: 5,
     comment: "",
   });
   const [submitting, setSubmitting] = useState(false);
-
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
   const [added, setAdded] = useState(false);
-
-  // 👉 trạng thái ẩn/bỏ bớt đánh giá
   const [showAllReviews, setShowAllReviews] = useState(false);
-
   const currentUser = getCurrentUser();
   const token = localStorage.getItem("token");
-
-  // ===== API =====
   const fetchCourse = async () => {
     try {
       setErr("");
-      const res = await axios.get(`${API_URL}/courses/${id}`); // ✅ dùng API_URL
+      const res = await axios.get(`${API_URL}/courses/${id}`); 
       setCourse(res.data);
     } catch (e) {
       console.error(e);
@@ -133,14 +102,11 @@ export default function CourseDetail() {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     setLoading(true);
     fetchCourse();
     window.scrollTo(0, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
   if (loading)
     return (
       <div className="max-w-6xl mx-auto px-6 py-16 animate-pulse">
@@ -149,15 +115,12 @@ export default function CourseDetail() {
         <div className="aspect-video bg-orange-200/30 rounded-2xl mb-6" />
       </div>
     );
-
   if (!course)
     return (
       <p className="text-center mt-16 text-red-500">
         {err || "Không tìm thấy khoá học."}
       </p>
     );
-
-  // ===== derive =====
   const title = course?.title || "Khoá học";
   const teacherName =
     course?.teacher?.name ||
@@ -166,17 +129,13 @@ export default function CourseDetail() {
   const reviews = course.reviews || [];
   const reviewsCount = reviews.length;
   const students = Number(course?.students ?? 0);
-
-  // 👉 Số review hiển thị khi thu gọn (giống Shopee/TikTok: 2 cái đầu)
   const MAX_COLLAPSED = 2;
   const visibleReviews = showAllReviews
     ? reviews
     : reviews.slice(0, MAX_COLLAPSED);
-
   const demoUrlRaw =
     course?.demoVideo || course?.videoDemo || course?.introVideo || "";
   const embedUrl = toYouTubeEmbed(demoUrlRaw);
-
   const rawPrice = typeof course?.price === "number" ? course.price : 0;
   const finalPrice = Math.max(0, Math.round(rawPrice * (1 - discount)));
   const priceText = finalPrice
@@ -184,18 +143,13 @@ export default function CourseDetail() {
         discount ? ` (−${discount * 100}%)` : ""
       }`
     : "Miễn phí";
-
-  // backend có thể trả isEnrolled = true nếu user đã mua
   const isEnrolled = !!course?.isEnrolled;
-
-  // ===== Actions =====
   const applyCoupon = () => {
     const code = coupon.trim().toUpperCase();
     if (code === "SALE10") setDiscount(0.1);
     else if (code === "NEW20") setDiscount(0.2);
     else setDiscount(0);
   };
-
   const addToCart = () => {
     try {
       const item = {
@@ -205,42 +159,34 @@ export default function CourseDetail() {
         price: course.price || 0,
         qty: 1,
       };
-
       const cart = JSON.parse(localStorage.getItem("cart") || "[]");
       const idx = cart.findIndex((x) => x._id === item._id);
       if (idx >= 0) cart[idx].qty += 1;
       else cart.push(item);
-
       localStorage.setItem("cart", JSON.stringify(cart));
       window.dispatchEvent(new Event("cartUpdated"));
-
       setAdded(true);
       setTimeout(() => setAdded(false), 1500);
     } catch (err2) {
       console.error("Add to cart failed:", err2);
     }
   };
-
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
-
     if (!token || !currentUser) {
       alert("Bạn cần đăng nhập để đánh giá khoá học.");
       navigate("/login");
       return;
     }
-
     if (!newReview.comment.trim()) {
       alert("Vui lòng nhập nội dung nhận xét.");
       return;
     }
-
     try {
       setSubmitting(true);
       await axios.post(
         `${API_URL}/courses/${id}/reviews`,
         {
-          // ❗ Không gửi userName, backend tự lấy từ req.user
           rating: newReview.rating,
           comment: newReview.comment,
         },
@@ -253,7 +199,6 @@ export default function CourseDetail() {
           withCredentials: true,
         }
       );
-
       await fetchCourse();
       setNewReview({ rating: 5, comment: "" });
     } catch (error) {
@@ -263,10 +208,9 @@ export default function CourseDetail() {
       setSubmitting(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-orange-50/40 text-slate-800">
-      {/* ===== Header / Hero ===== */}
+      {}
       <div className="bg-gradient-to-b from-orange-50 to-white border-b border-orange-100">
         <div className="max-w-6xl mx-auto px-6 py-6">
           <nav className="text-sm text-slate-500">
@@ -279,16 +223,13 @@ export default function CourseDetail() {
             </Link>{" "}
             / <span className="text-slate-700">{title}</span>
           </nav>
-
           <h1 className="mt-3 text-3xl sm:text-4xl font-bold text-slate-900">
             {title}
           </h1>
-
           <p className="mt-2 text-slate-600 max-w-3xl">
             {course.shortDescription ||
               "Trong khoá học này, bạn sẽ học những kiến thức quan trọng để nâng cao kỹ năng của mình."}
           </p>
-
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <Stars value={ratingValue} />
             <span className="text-slate-600">({reviewsCount} đánh giá)</span>
@@ -310,12 +251,11 @@ export default function CourseDetail() {
           </div>
         </div>
       </div>
-
-      {/* ===== Main Content ===== */}
+      {}
       <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* ==== LEFT: video + mô tả ==== */}
+        {}
         <section className="lg:col-span-2 space-y-6">
-          {/* Video demo hoặc ảnh cover */}
+          {}
           {embedUrl ? (
             <div className="aspect-video rounded-2xl overflow-hidden bg-white shadow-lg border border-orange-100">
               <iframe
@@ -334,8 +274,7 @@ export default function CourseDetail() {
               className="w-full max-h-[420px] object-cover rounded-2xl border border-orange-100 shadow-soft"
             />
           )}
-
-          {/* Phần highlight: bạn sẽ học được gì */}
+          {}
           <div className="rounded-2xl bg-white border border-orange-100 p-6">
             <h2 className="text-xl font-semibold text-orange-600 mb-2">
               Bạn sẽ học được gì?
@@ -353,8 +292,7 @@ export default function CourseDetail() {
               </p>
             )}
           </div>
-
-          {/* Mô tả chi tiết */}
+          {}
           <div className="rounded-2xl bg-white border border-orange-100 p-6">
             <h2 className="text-xl font-semibold text-orange-600 mb-2">
               Mô tả khoá học
@@ -363,8 +301,7 @@ export default function CourseDetail() {
               {course.description || "Chưa có mô tả cho khoá học này."}
             </p>
           </div>
-
-          {/* Đối tượng phù hợp */}
+          {}
           <div className="rounded-2xl bg-white border border-orange-100 p-6">
             <h2 className="text-xl font-semibold text-orange-600 mb-2">
               Khoá học dành cho ai?
@@ -382,8 +319,7 @@ export default function CourseDetail() {
               </p>
             )}
           </div>
-
-          {/* Đánh giá */}
+          {}
           <div className="rounded-2xl bg-white border border-orange-100 p-6">
             <h2 className="text-xl font-semibold text-orange-600 mb-3">
               Đánh giá khoá học
@@ -394,8 +330,7 @@ export default function CourseDetail() {
                 {ratingValue.toFixed(1)}/5 ({reviewsCount} đánh giá)
               </span>
             </div>
-
-            {/* Danh sách đánh giá */}
+            {}
             <div className="space-y-3">
               {reviewsCount ? (
                 <>
@@ -420,7 +355,6 @@ export default function CourseDetail() {
                       )}
                     </div>
                   ))}
-
                   {reviewsCount > MAX_COLLAPSED && (
                     <button
                       type="button"
@@ -437,13 +371,12 @@ export default function CourseDetail() {
                 <p className="text-slate-500 italic">Chưa có đánh giá nào.</p>
               )}
             </div>
-
-            {/* form gửi đánh giá */}
+            {}
             <form
               onSubmit={handleReviewSubmit}
               className="mt-5 space-y-3 border-t border-orange-100 pt-4"
             >
-              {/* Tên user: tự lấy từ tài khoản */}
+              {}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
                 <div className="sm:col-span-1">
                   <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -456,8 +389,7 @@ export default function CourseDetail() {
                     disabled
                   />
                 </div>
-
-                {/* Chọn số sao */}
+                {}
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Đánh giá
@@ -470,7 +402,6 @@ export default function CourseDetail() {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Nhận xét của bạn
@@ -488,7 +419,6 @@ export default function CourseDetail() {
                   }
                 />
               </div>
-
               <button
                 disabled={submitting}
                 className={`w-full rounded-xl bg-orange-500 text-white py-2 font-semibold hover:bg-orange-600 active:bg-orange-700 transition ${
@@ -500,8 +430,7 @@ export default function CourseDetail() {
             </form>
           </div>
         </section>
-
-        {/* ==== RIGHT: card mua khóa ==== */}
+        {}
         <aside className="lg:col-span-1">
           <div className="lg:sticky lg:top-6 rounded-2xl bg-white shadow-md border border-orange-100 p-4">
             <img
@@ -511,13 +440,11 @@ export default function CourseDetail() {
               alt={title}
               className="w-full h-40 object-cover rounded-xl border border-orange-100"
             />
-
             <div className="mt-4">
               <div className="text-2xl font-bold text-orange-600">
                 {priceText}
               </div>
-
-              {/* Nếu đã mua thì cho nút Vào học */}
+              {}
               {isEnrolled && (
                 <button
                   onClick={() => navigate(`/learning/${course._id}`)}
@@ -526,14 +453,12 @@ export default function CourseDetail() {
                   Vào học ngay
                 </button>
               )}
-
               <button
                 onClick={() => navigate(`/registercourse/${course._id}`)}
                 className="mt-3 w-full rounded-xl bg-orange-500 text-white py-2.5 font-semibold hover:bg-orange-600 active:bg-orange-700 transition"
               >
                 {isEnrolled ? "Mua thêm cho người khác" : "Mua ngay"}
               </button>
-
               <button
                 onClick={addToCart}
                 className="mt-2 w-full rounded-xl border border-orange-200 text-orange-600 py-2.5 font-semibold hover:bg-orange-50 transition"
@@ -541,7 +466,6 @@ export default function CourseDetail() {
                 {added ? "✔ Đã thêm vào giỏ" : "Thêm vào giỏ hàng"}
               </button>
             </div>
-
             <div className="mt-4">
               <p className="text-sm font-medium text-slate-700 mb-2">
                 Áp dụng mã giảm giá

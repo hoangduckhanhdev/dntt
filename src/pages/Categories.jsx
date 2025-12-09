@@ -1,127 +1,1 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { BookOpen } from "lucide-react";
-import { motion } from "framer-motion";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay } from "swiper/modules";
-import "swiper/css";
-import "swiper/css/autoplay";
-
-import { API_URL } from "../api/config";
-
-export default function Categories() {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/category`);
-        setCategories(res.data);
-      } catch (err) {
-        console.error("Lỗi khi lấy danh mục:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCategories();
-  }, []);
-
-  const handleCategoryClick = (categoryId) => {
-    navigate(`/courses?category=${categoryId}`);
-  };
-
-  return (
-    <section className="max-w-7xl mx-auto px-6 mt-12 mb-20">
-      <h2 className="text-3xl font-extrabold mb-10 text-gray-800 text-center">
-        Danh mục khóa học
-      </h2>
-
-      {categories.length > 0 && (
-        <div className="mb-16">
-          <Swiper
-            modules={[Autoplay]}
-            autoplay={{ delay: 3000 }}
-            spaceBetween={20}
-            slidesPerView={1}
-            breakpoints={{
-              640: { slidesPerView: 2 },
-              1024: { slidesPerView: 4 },
-            }}
-          >
-            {categories.slice(0, 6).map((c) => (
-              <SwiperSlide key={c._id}>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleCategoryClick(c._id)}
-                  className="relative cursor-pointer overflow-hidden rounded-2xl shadow-lg group"
-                >
-                  <img
-                    src={
-                      c.image ||
-                      "https://source.unsplash.com/400x300/?education,learning"
-                    }
-                    alt={c.name}
-                    className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-semibold text-lg group-hover:bg-black/60 transition-colors">
-                    {c.name}
-                  </div>
-                </motion.div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8">
-          {Array(8)
-            .fill(0)
-            .map((_, i) => (
-              <div
-                key={i}
-                className="animate-pulse bg-gray-100 rounded-2xl h-[200px]"
-              ></div>
-            ))}
-        </div>
-      ) : categories.length === 0 ? (
-        <p className="text-center text-gray-500">
-          Không có danh mục nào để hiển thị.
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-          {categories.map((c) => (
-            <motion.div
-              key={c._id}
-              onClick={() => handleCategoryClick(c._id)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.97 }}
-              className="flex flex-col items-center justify-center bg-white rounded-2xl 
-                         shadow-md hover:shadow-xl transition transform hover:-translate-y-1 
-                         p-8 cursor-pointer hover:bg-indigo-50 min-h-[200px]"
-            >
-              <div className="mb-4">
-                {c.icon ? (
-                  <img
-                    src={c.icon}
-                    alt={c.name}
-                    className="w-16 h-16 object-contain"
-                  />
-                ) : (
-                  <BookOpen className="w-16 h-16 text-indigo-600" />
-                )}
-              </div>
-              <p className="text-lg font-semibold text-gray-800 text-center">
-                {c.name}
-              </p>
-            </motion.div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
+import React, { useEffect, useState } from "react";import { useNavigate } from "react-router-dom";import axios from "axios";import { BookOpen } from "lucide-react";import { motion } from "framer-motion";import { Swiper, SwiperSlide } from "swiper/react";import { Autoplay } from "swiper/modules";import "swiper/css";import "swiper/css/autoplay";import { API_URL } from "../api/config";export default function Categories() {  const [categories, setCategories] = useState([]);  const [loading, setLoading] = useState(true);  const navigate = useNavigate();  useEffect(() => {    const fetchCategories = async () => {      try {        const res = await axios.get(`${API_URL}/category`);        setCategories(res.data);      } catch (err) {        console.error("Lỗi khi lấy danh mục:", err);      } finally {        setLoading(false);      }    };    fetchCategories();  }, []);  const handleCategoryClick = (categoryId) => {    navigate(`/courses?category=${categoryId}`);  };  return (    <section className="max-w-7xl mx-auto px-6 mt-12 mb-20">      <h2 className="text-3xl font-extrabold mb-10 text-gray-800 text-center">        Danh mục khóa học      </h2>      {categories.length > 0 && (        <div className="mb-16">          <Swiper            modules={[Autoplay]}            autoplay={{ delay: 3000 }}            spaceBetween={20}            slidesPerView={1}            breakpoints={{              640: { slidesPerView: 2 },              1024: { slidesPerView: 4 },            }}          >            {categories.slice(0, 6).map((c) => (              <SwiperSlide key={c._id}>                <motion.div                  whileHover={{ scale: 1.05 }}                  whileTap={{ scale: 0.98 }}                  onClick={() => handleCategoryClick(c._id)}                  className="relative cursor-pointer overflow-hidden rounded-2xl shadow-lg group"                >                  <img                    src={                      c.image ||                      "https://source.unsplash.com/400x300/?education,learning"                    }                    alt={c.name}                    className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-500"                  />                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-semibold text-lg group-hover:bg-black/60 transition-colors">                    {c.name}                  </div>                </motion.div>              </SwiperSlide>            ))}          </Swiper>        </div>      )}      {loading ? (        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8">          {Array(8)            .fill(0)            .map((_, i) => (              <div                key={i}                className="animate-pulse bg-gray-100 rounded-2xl h-[200px]"              ></div>            ))}        </div>      ) : categories.length === 0 ? (        <p className="text-center text-gray-500">          Không có danh mục nào để hiển thị.        </p>      ) : (        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">          {categories.map((c) => (            <motion.div              key={c._id}              onClick={() => handleCategoryClick(c._id)}              whileHover={{ scale: 1.05 }}              whileTap={{ scale: 0.97 }}              className="flex flex-col items-center justify-center bg-white rounded-2xl                          shadow-md hover:shadow-xl transition transform hover:-translate-y-1                          p-8 cursor-pointer hover:bg-indigo-50 min-h-[200px]"            >              <div className="mb-4">                {c.icon ? (                  <img                    src={c.icon}                    alt={c.name}                    className="w-16 h-16 object-contain"                  />                ) : (                  <BookOpen className="w-16 h-16 text-indigo-600" />                )}              </div>              <p className="text-lg font-semibold text-gray-800 text-center">                {c.name}              </p>            </motion.div>          ))}        </div>      )}    </section>  );}

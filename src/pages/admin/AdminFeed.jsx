@@ -1,288 +1,1 @@
-// src/pages/admin/AdminFeed.jsx
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import {
-  MessageCircle,
-  Heart,
-  Pin,
-  Trash2,
-  RefreshCw,
-  Image as ImageIcon,
-  Video,
-  Tag,
-  User,
-} from "lucide-react";
-
-const API_BASE = "http://localhost:5000/api";
-
-// 🔐 Helper: cấu hình axios kèm token
-const getAuthConfig = () => {
-  try {
-    const token = localStorage.getItem("token");
-    const headers = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    return { headers, withCredentials: true };
-  } catch {
-    return { withCredentials: true };
-  }
-};
-
-// Map loại bài viết -> nhãn + màu
-const typeLabelMap = {
-  question: "Câu hỏi",
-  lesson_suggestion: "Bài học gợi ý",
-  blog: "Blog",
-  announcement: "Thông báo",
-  mini_quiz: "Mini quiz",
-};
-
-const typeColorMap = {
-  question: "bg-sky-50 text-sky-600 border-sky-100",
-  lesson_suggestion: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  blog: "bg-violet-50 text-violet-600 border-violet-100",
-  announcement: "bg-amber-50 text-amber-700 border-amber-100",
-  mini_quiz: "bg-pink-50 text-pink-600 border-pink-100",
-};
-
-const roleColorMap = {
-  student: "bg-slate-50 text-slate-600 border-slate-100",
-  teacher: "bg-indigo-50 text-indigo-600 border-indigo-100",
-  admin: "bg-rose-50 text-rose-600 border-rose-100",
-};
-
-export default function AdminFeed() {
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const loadFeed = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(
-        `${API_BASE}/feed?page=1&limit=50`,
-        getAuthConfig()
-      );
-      setPosts(res.data || []);
-    } catch (err) {
-      console.error("AdminFeed load error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadFeed();
-  }, []);
-
-  const handleTogglePin = async (post) => {
-    try {
-      await axios.patch(
-        `${API_BASE}/feed/${post._id}/pin`,
-        { isPinned: !post.isPinned },
-        getAuthConfig()
-      );
-      loadFeed();
-    } catch (err) {
-      console.error("Pin error:", err);
-    }
-  };
-
-  const handleDelete = async (post) => {
-    if (!window.confirm("Bạn có chắc muốn xóa bài này?")) return;
-    try {
-      await axios.delete(`${API_BASE}/feed/${post._id}`, getAuthConfig());
-      loadFeed();
-    } catch (err) {
-      console.error("Delete error:", err);
-    }
-  };
-
-  const renderMediaBadge = (post) => {
-    if (!post.media?.url) {
-      return <span className="text-[11px] text-slate-400">—</span>;
-    }
-    if (post.media.type === "video") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-white text-[11px]">
-          <Video className="w-3 h-3" />
-          <span>Video</span>
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px]">
-        <ImageIcon className="w-3 h-3" />
-        <span>Ảnh</span>
-      </span>
-    );
-  };
-
-  return (
-    <div className="p-6">
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">
-            Quản lý LearnFeed
-          </h1>
-          <p className="text-sm text-slate-500">
-            Admin có thể xem, ghim và xóa các bài viết trên bảng tin học tập.
-          </p>
-        </div>
-
-        <button
-          onClick={loadFeed}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-orange-200 bg-white text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          <span>Làm mới</span>
-        </button>
-      </div>
-
-      {/* LIST */}
-      <div className="rounded-2xl border border-orange-100 bg-white shadow-sm overflow-hidden">
-        {/* HEADER ROW */}
-        <div className="grid grid-cols-[1.4fr_0.6fr_0.9fr_2.2fr_1.3fr_0.9fr_1fr_0.8fr_0.9fr] text-xs font-semibold text-slate-500 bg-orange-50/60 border-b border-orange-100">
-          <div className="px-4 py-2.5">Tác giả</div>
-          <div className="px-2 py-2.5">Role</div>
-          <div className="px-2 py-2.5">Loại</div>
-          <div className="px-2 py-2.5">Nội dung</div>
-          <div className="px-2 py-2.5 text-center">Media</div>
-          <div className="px-2 py-2.5 text-center">Like</div>
-          <div className="px-2 py-2.5 text-center">Comment</div>
-          <div className="px-2 py-2.5 text-center">Pinned</div>
-          <div className="px-2 py-2.5 text-center">Hành động</div>
-        </div>
-
-        {loading ? (
-          <div className="py-6 text-center text-sm text-slate-500">
-            Đang tải danh sách bài viết...
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="py-6 text-center text-sm text-slate-500">
-            Chưa có bài viết nào.
-          </div>
-        ) : (
-          posts.map((post, idx) => (
-            <div
-              key={post._id}
-              className={`grid grid-cols-[1.4fr_0.6fr_0.9fr_2.2fr_1.3fr_0.9fr_1fr_0.8fr_0.9fr] text-xs border-t border-slate-100 ${
-                idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
-              }`}
-            >
-              {/* TÁC GIẢ */}
-              <div className="px-4 py-3 flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-[11px] font-semibold text-orange-700 uppercase overflow-hidden">
-                  {post.author?.avatar ? (
-                    <img
-                      src={post.author.avatar}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    (post.author?.name || "U")[0]?.toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[13px] font-medium text-slate-900 truncate">
-                    {post.author?.name || "User"}
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    {new Date(post.createdAt).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-
-              {/* ROLE */}
-              <div className="px-2 py-3 flex items-center">
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] ${
-                    roleColorMap[post.role] || roleColorMap.student
-                  }`}
-                >
-                  <User className="w-3 h-3" />
-                  <span>
-                    {post.role === "teacher"
-                      ? "Giảng viên"
-                      : post.role === "admin"
-                      ? "Admin"
-                      : "Học viên"}
-                  </span>
-                </span>
-              </div>
-
-              {/* LOẠI */}
-              <div className="px-2 py-3 flex items-center">
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] ${
-                    typeColorMap[post.type] || "bg-slate-50 text-slate-600"
-                  }`}
-                >
-                  <Tag className="w-3 h-3" />
-                  <span>{typeLabelMap[post.type] || "Khác"}</span>
-                </span>
-              </div>
-
-              {/* NỘI DUNG */}
-              <div className="px-2 py-3 text-[13px] text-slate-800 line-clamp-2">
-                {post.type === "mini_quiz" && post.quiz?.question
-                  ? post.quiz.question
-                  : post.content}
-              </div>
-
-              {/* MEDIA */}
-              <div className="px-2 py-3 flex items-center justify-center">
-                {renderMediaBadge(post)}
-              </div>
-
-              {/* LIKE */}
-              <div className="px-2 py-3 flex items-center justify-center text-slate-600">
-                <div className="inline-flex items-center gap-1">
-                  <Heart className="w-3 h-3 text-rose-500" />
-                  <span>{post.likesCount || 0}</span>
-                </div>
-              </div>
-
-              {/* COMMENT */}
-              <div className="px-2 py-3 flex items-center justify-center text-slate-600">
-                <div className="inline-flex items-center gap-1">
-                  <MessageCircle className="w-3 h-3 text-sky-500" />
-                  <span>{post.commentsCount || 0}</span>
-                </div>
-              </div>
-
-              {/* PINNED */}
-              <div className="px-2 py-3 flex items-center justify-center">
-                {post.isPinned ? (
-                  <span className="text-[11px] text-amber-600 flex items-center gap-1">
-                    <Pin className="w-3 h-3 fill-amber-500 text-amber-500" />
-                    Đang ghim
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-slate-400">—</span>
-                )}
-              </div>
-
-              {/* ACTIONS */}
-              <div className="px-2 py-3 flex items-center justify-center gap-2">
-                <button
-                  onClick={() => handleTogglePin(post)}
-                  className="p-1.5 rounded-full hover:bg-amber-50 text-amber-600"
-                  title={post.isPinned ? "Bỏ ghim" : "Ghim bài"}
-                >
-                  <Pin className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(post)}
-                  className="p-1.5 rounded-full hover:bg-rose-50 text-rose-600"
-                  title="Xoá bài"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
+import React, { useEffect, useState } from "react";import axios from "axios";import {  MessageCircle,  Heart,  Pin,  Trash2,  RefreshCw,  Image as ImageIcon,  Video,  Tag,  User,} from "lucide-react";const API_BASE = "http://localhost:5000/api";const getAuthConfig = () => {  try {    const token = localStorage.getItem("token");    const headers = {};    if (token) headers.Authorization = `Bearer ${token}`;    return { headers, withCredentials: true };  } catch {    return { withCredentials: true };  }};const typeLabelMap = {  question: "Câu hỏi",  lesson_suggestion: "Bài học gợi ý",  blog: "Blog",  announcement: "Thông báo",  mini_quiz: "Mini quiz",};const typeColorMap = {  question: "bg-sky-50 text-sky-600 border-sky-100",  lesson_suggestion: "bg-emerald-50 text-emerald-600 border-emerald-100",  blog: "bg-violet-50 text-violet-600 border-violet-100",  announcement: "bg-amber-50 text-amber-700 border-amber-100",  mini_quiz: "bg-pink-50 text-pink-600 border-pink-100",};const roleColorMap = {  student: "bg-slate-50 text-slate-600 border-slate-100",  teacher: "bg-indigo-50 text-indigo-600 border-indigo-100",  admin: "bg-rose-50 text-rose-600 border-rose-100",};export default function AdminFeed() {  const [posts, setPosts] = useState([]);  const [loading, setLoading] = useState(false);  const [currentPage, setCurrentPage] = useState(1);  const pageSize = 5;   const loadFeed = async () => {    try {      setLoading(true);      const res = await axios.get(        `${API_BASE}/feed?page=1&limit=50`,        getAuthConfig()      );      setPosts(res.data || []);    } catch (err) {      console.error("AdminFeed load error:", err);    } finally {      setLoading(false);    }  };  useEffect(() => {    loadFeed();  }, []);  const totalPages = Math.max(1, Math.ceil(posts.length / pageSize));  const startIndex = (currentPage - 1) * pageSize;  const paginatedPosts = posts.slice(startIndex, startIndex + pageSize);  useEffect(() => {    if (currentPage > totalPages) {      setCurrentPage(totalPages);    }  }, [totalPages, currentPage]);  const handleTogglePin = async (post) => {    try {      await axios.patch(        `${API_BASE}/feed/${post._id}/pin`,        { isPinned: !post.isPinned },        getAuthConfig()      );      loadFeed();    } catch (err) {      console.error("Pin error:", err);    }  };  const handleDelete = async (post) => {    if (!window.confirm("Bạn có chắc muốn xóa bài này?")) return;    try {      await axios.delete(`${API_BASE}/feed/${post._id}`, getAuthConfig());      loadFeed();    } catch (err) {      console.error("Delete error:", err);    }  };  const renderMediaBadge = (post) => {    if (!post.media?.url) {      return <span className="text-[11px] text-slate-400">—</span>;    }    if (post.media.type === "video") {      return (        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-white text-[11px]">          <Video className="w-3 h-3" />          <span>Video</span>        </span>      );    }    return (      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px]">        <ImageIcon className="w-3 h-3" />        <span>Ảnh</span>      </span>    );  };  return (    <div className="p-6">      {}      <div className="flex items-center justify-between mb-4">        <div>          <h1 className="text-xl font-bold text-slate-900">            Quản lý LearnFeed          </h1>          <p className="text-sm text-slate-500">            Admin có thể xem, ghim và xóa các bài viết trên bảng tin học tập.          </p>        </div>        <button          onClick={loadFeed}          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-orange-200 bg-white text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors"        >          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />          <span>Làm mới</span>        </button>      </div>      {}      <div className="rounded-2xl border border-orange-100 bg-white shadow-sm overflow-hidden">        {}        <div className="grid grid-cols-[1.4fr_0.6fr_0.9fr_2.2fr_1.3fr_0.9fr_1fr_0.8fr_0.9fr] text-xs font-semibold text-slate-500 bg-orange-50/60 border-b border-orange-100">          <div className="px-4 py-2.5">Tác giả</div>          <div className="px-2 py-2.5">Role</div>          <div className="px-2 py-2.5">Loại</div>          <div className="px-2 py-2.5">Nội dung</div>          <div className="px-2 py-2.5 text-center">Media</div>          <div className="px-2 py-2.5 text-center">Like</div>          <div className="px-2 py-2.5 text-center">Comment</div>          <div className="px-2 py-2.5 text-center">Pinned</div>          <div className="px-2 py-2.5 text-center">Hành động</div>        </div>        {loading ? (          <div className="py-6 text-center text-sm text-slate-500">            Đang tải danh sách bài viết...          </div>        ) : posts.length === 0 ? (          <div className="py-6 text-center text-sm text-slate-500">            Chưa có bài viết nào.          </div>        ) : (          <>            {paginatedPosts.map((post, idx) => (              <div                key={post._id}                className={`grid grid-cols-[1.4fr_0.6fr_0.9fr_2.2fr_1.3fr_0.9fr_1fr_0.8fr_0.9fr] text-xs border-t border-slate-100 ${                  idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"                }`}              >                {}                <div className="px-4 py-3 flex items-center gap-2 min-w-0">                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-[11px] font-semibold text-orange-700 uppercase overflow-hidden">                    {post.author?.avatar ? (                      <img                        src={post.author.avatar}                        alt=""                        className="w-full h-full object-cover"                      />                    ) : (                      (post.author?.name || "U")[0]?.toUpperCase()                    )}                  </div>                  <div className="min-w-0">                    <div className="text-[13px] font-medium text-slate-900 truncate">                      {post.author?.name || "User"}                    </div>                    <div className="text-[11px] text-slate-400">                      {new Date(post.createdAt).toLocaleString()}                    </div>                  </div>                </div>                {}                <div className="px-2 py-3 flex items-center">                  <span                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] ${                      roleColorMap[post.role] || roleColorMap.student                    }`}                  >                    <User className="w-3 h-3" />                    <span>                      {post.role === "teacher"                        ? "Giảng viên"                        : post.role === "admin"                        ? "Admin"                        : "Học viên"}                    </span>                  </span>                </div>                {}                <div className="px-2 py-3 flex items-center">                  <span                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] ${                      typeColorMap[post.type] || "bg-slate-50 text-slate-600"                    }`}                  >                    <Tag className="w-3 h-3" />                    <span>{typeLabelMap[post.type] || "Khác"}</span>                  </span>                </div>                {}                <div className="px-2 py-3 text-[13px] text-slate-800 line-clamp-2">                  {post.type === "mini_quiz" && post.quiz?.question                    ? post.quiz.question                    : post.content}                </div>                {}                <div className="px-2 py-3 flex items-center justify-center">                  {renderMediaBadge(post)}                </div>                {}                <div className="px-2 py-3 flex items-center justify-center text-slate-600">                  <div className="inline-flex items-center gap-1">                    <Heart className="w-3 h-3 text-rose-500" />                    <span>{post.likesCount || 0}</span>                  </div>                </div>                {}                <div className="px-2 py-3 flex items-center justify-center text-slate-600">                  <div className="inline-flex items-center gap-1">                    <MessageCircle className="w-3 h-3 text-sky-500" />                    <span>{post.commentsCount || 0}</span>                  </div>                </div>                {}                <div className="px-2 py-3 flex items-center justify-center">                  {post.isPinned ? (                    <span className="text-[11px] text-amber-600 flex items-center gap-1">                      <Pin className="w-3 h-3 fill-amber-500 text-amber-500" />                      Đang ghim                    </span>                  ) : (                    <span className="text-[11px] text-slate-400">—</span>                  )}                </div>                {}                <div className="px-2 py-3 flex items-center justify-center gap-2">                  <button                    onClick={() => handleTogglePin(post)}                    className="p-1.5 rounded-full hover:bg-amber-50 text-amber-600"                    title={post.isPinned ? "Bỏ ghim" : "Ghim bài"}                  >                    <Pin className="w-4 h-4" />                  </button>                  <button                    onClick={() => handleDelete(post)}                    className="p-1.5 rounded-full hover:bg-rose-50 text-rose-600"                    title="Xoá bài"                  >                    <Trash2 className="w-4 h-4" />                  </button>                </div>              </div>            ))}            {}            <div className="px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3 text-xs md:text-sm text-slate-600 border-t border-orange-100">              <div>                Hiển thị{" "}                <span className="font-semibold">                  {startIndex + 1}–                  {Math.min(startIndex + pageSize, posts.length)}                </span>{" "}                trên <span className="font-semibold">{posts.length}</span> bài                viết              </div>              <div className="flex items-center gap-1">                <button                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}                  disabled={currentPage === 1}                  className={`px-3 py-1 rounded-md border ${                    currentPage === 1                      ? "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed"                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"                  }`}                >                  Trước                </button>                {Array.from({ length: totalPages }).map((_, i) => {                  const page = i + 1;                  const active = page === currentPage;                  return (                    <button                      key={page}                      onClick={() => setCurrentPage(page)}                      className={`px-3 py-1 rounded-md border text-xs md:text-sm ${                        active                          ? "bg-orange-500 text-white border-orange-500"                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"                      }`}                    >                      {page}                    </button>                  );                })}                <button                  onClick={() =>                    setCurrentPage((p) => Math.min(totalPages, p + 1))                  }                  disabled={currentPage === totalPages}                  className={`px-3 py-1 rounded-md border ${                    currentPage === totalPages                      ? "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed"                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"                  }`}                >                  Sau                </button>              </div>            </div>          </>        )}      </div>    </div>  );}

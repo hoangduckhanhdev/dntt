@@ -1,130 +1,1 @@
-// src/pages/RegisterSuccess.jsx
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { useSearchParams, Link } from "react-router-dom";
-import { API_URL } from "../api/config"; // ✅ dùng config chung
-
-export default function RegisterSuccess() {
-  const [params] = useSearchParams();
-  const orderCode = params.get("orderCode");
-
-  const [msg, setMsg] = useState("⏳ Đang xác nhận thanh toán...");
-  const [success, setSuccess] = useState(null); // true | false | null (đang chờ)
-
-  useEffect(() => {
-    let stopped = false;
-    let timer;
-
-    const syncThenCheck = async () => {
-      if (!orderCode) {
-        setMsg("❌ Thiếu orderCode trong URL, không thể xác nhận giao dịch.");
-        setSuccess(false);
-        return;
-      }
-
-      try {
-        // 1) Đồng bộ với PayOS (cập nhật DB nếu đã PAID)
-        await axios.get(`${API_URL}/payments/confirm-return`, {
-          params: { orderCode },
-          withCredentials: true,
-        });
-      } catch (e) {
-        // Không sao, vẫn chuyển sang bước check-status
-        console.warn(
-          "confirm-return warning:",
-          e?.response?.data || e.message
-        );
-      }
-
-      // 2) Poll check-status 6 lần (mỗi 1.5s)
-      const MAX_TRIES = 6;
-      const DELAY = 1500;
-
-      let tries = 0;
-
-      const poll = async () => {
-        if (stopped) return;
-
-        try {
-          const res = await axios.get(`${API_URL}/payments/check-status`, {
-            params: { orderCode },
-            withCredentials: true,
-          });
-
-          if (res.data?.status === "paid") {
-            setMsg("🎉 Thanh toán thành công! Bạn đã đăng ký học thành công!");
-            setSuccess(true);
-            return; // xong, dừng poll
-          }
-        } catch (err) {
-          console.warn(
-            "check-status error:",
-            err?.response?.data || err.message
-          );
-        }
-
-        tries += 1;
-        if (tries >= MAX_TRIES) {
-          setMsg(
-            "⚠️ Thanh toán chưa được xác nhận hoàn tất. Nếu tiền đã trừ, vui lòng liên hệ hỗ trợ hoặc kiểm tra lại sau ít phút."
-          );
-          setSuccess(false);
-          return;
-        }
-
-        timer = setTimeout(poll, DELAY);
-      };
-
-      poll();
-    };
-
-    syncThenCheck();
-
-    return () => {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [orderCode]);
-
-  return (
-    <div
-      className={`h-screen flex flex-col items-center justify-center text-white transition-all duration-500 px-4 text-center ${
-        success === null
-          ? "bg-gradient-to-r from-yellow-400 to-orange-500"
-          : success
-          ? "bg-gradient-to-r from-green-500 to-emerald-600"
-          : "bg-gradient-to-r from-red-500 to-rose-600"
-      }`}
-    >
-      <h1 className="text-3xl md:text-4xl font-bold mb-4 px-2">{msg}</h1>
-
-      <div className="flex flex-wrap justify-center gap-3">
-        <Link
-          to="/courses"
-          className="bg-white text-gray-700 px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition shadow"
-        >
-          Về trang Khóa học
-        </Link>
-        <Link
-          to="/"
-          className="bg-white/90 text-gray-700 px-5 py-2 rounded-lg font-semibold hover:bg-white transition shadow"
-        >
-          Trang chủ
-        </Link>
-      </div>
-
-      {orderCode && (
-        <p className="mt-4 opacity-90 text-sm">
-          Mã đơn hàng:{" "}
-          <b className="underline decoration-dotted">{orderCode}</b>
-        </p>
-      )}
-
-      {success === null && (
-        <p className="mt-3 text-xs opacity-90">
-          Hệ thống đang kết nối PayOS và kiểm tra trạng thái giao dịch…
-        </p>
-      )}
-    </div>
-  );
-}
+import React, { useEffect, useState } from "react";import axios from "axios";import { useSearchParams, Link } from "react-router-dom";import { API_URL } from "../api/config"; export default function RegisterSuccess() {  const [params] = useSearchParams();  const orderCode = params.get("orderCode");  const [msg, setMsg] = useState("⏳ Đang xác nhận thanh toán...");  const [success, setSuccess] = useState(null);   useEffect(() => {    let stopped = false;    let timer;    const syncThenCheck = async () => {      if (!orderCode) {        setMsg("❌ Thiếu orderCode trong URL, không thể xác nhận giao dịch.");        setSuccess(false);        return;      }      try {        await axios.get(`${API_URL}/payments/confirm-return`, {          params: { orderCode },          withCredentials: true,        });      } catch (e) {        console.warn(          "confirm-return warning:",          e?.response?.data || e.message        );      }      const MAX_TRIES = 6;      const DELAY = 1500;      let tries = 0;      const poll = async () => {        if (stopped) return;        try {          const res = await axios.get(`${API_URL}/payments/check-status`, {            params: { orderCode },            withCredentials: true,          });          if (res.data?.status === "paid") {            setMsg("🎉 Thanh toán thành công! Bạn đã đăng ký học thành công!");            setSuccess(true);            return;           }        } catch (err) {          console.warn(            "check-status error:",            err?.response?.data || err.message          );        }        tries += 1;        if (tries >= MAX_TRIES) {          setMsg(            "⚠️ Thanh toán chưa được xác nhận hoàn tất. Nếu tiền đã trừ, vui lòng liên hệ hỗ trợ hoặc kiểm tra lại sau ít phút."          );          setSuccess(false);          return;        }        timer = setTimeout(poll, DELAY);      };      poll();    };    syncThenCheck();    return () => {      stopped = true;      if (timer) clearTimeout(timer);    };  }, [orderCode]);  return (    <div      className={`h-screen flex flex-col items-center justify-center text-white transition-all duration-500 px-4 text-center ${        success === null          ? "bg-gradient-to-r from-yellow-400 to-orange-500"          : success          ? "bg-gradient-to-r from-green-500 to-emerald-600"          : "bg-gradient-to-r from-red-500 to-rose-600"      }`}    >      <h1 className="text-3xl md:text-4xl font-bold mb-4 px-2">{msg}</h1>      <div className="flex flex-wrap justify-center gap-3">        <Link          to="/courses"          className="bg-white text-gray-700 px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition shadow"        >          Về trang Khóa học        </Link>        <Link          to="/"          className="bg-white/90 text-gray-700 px-5 py-2 rounded-lg font-semibold hover:bg-white transition shadow"        >          Trang chủ        </Link>      </div>      {orderCode && (        <p className="mt-4 opacity-90 text-sm">          Mã đơn hàng:{" "}          <b className="underline decoration-dotted">{orderCode}</b>        </p>      )}      {success === null && (        <p className="mt-3 text-xs opacity-90">          Hệ thống đang kết nối PayOS và kiểm tra trạng thái giao dịch…        </p>      )}    </div>  );}

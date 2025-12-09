@@ -1,29 +1,1 @@
-// src/components/feed/FeedFilterBar.jsx
-import React from "react";
-
-const options = [
-  { value: "", label: "Tất cả" },
-  { value: "lesson_suggestion", label: "Bài học gợi ý" },
-  { value: "question", label: "Câu hỏi" },
-  { value: "blog", label: "Blog giáo viên" },
-  { value: "announcement", label: "Thông báo" },
-  { value: "mini_quiz", label: "Mini Quiz" },
-];
-
-export default function FeedFilterBar({ value, onChange }) {
-  return (
-    <div className="flex gap-2 mb-3 overflow-x-auto">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className={`px-3 py-1 rounded-full text-sm border ${
-            value === opt.value ? "bg-blue-600 text-white" : "bg-white"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+import React from "react";const options = [  { value: "", label: "Tất cả" },  { value: "lesson_suggestion", label: "Bài học gợi ý" },  { value: "question", label: "Câu hỏi" },  { value: "blog", label: "Blog giáo viên" },  { value: "announcement", label: "Thông báo" },  { value: "mini_quiz", label: "Mini Quiz" },];export default function FeedFilterBar({ value, onChange }) {  return (    <div className="flex gap-2 mb-3 overflow-x-auto">      {options.map((opt) => (        <button          key={opt.value}          onClick={() => onChange(opt.value)}          className={`px-3 py-1 rounded-full text-sm border ${            value === opt.value ? "bg-blue-600 text-white" : "bg-white"          }`}        >          {opt.label}        </button>      ))}    </div>  );}

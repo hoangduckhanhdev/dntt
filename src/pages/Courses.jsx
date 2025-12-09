@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import CourseCard from "../components/CourseCard";
-import { API_URL } from "../api/config"; // ✅ THÊM DÒNG NÀY
-
+import { API_URL } from "../api/config"; 
 export default function Courses() {
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -11,20 +10,15 @@ export default function Courses() {
   const [sortBy, setSortBy] = useState("newest");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-
-  // Fetch data
   useEffect(() => {
     const fetchData = async () => {
       try {
         setErr("");
         setLoading(true);
-
         const [courseRes, categoryRes] = await Promise.all([
           axios.get(`${API_URL}/courses`),
           axios.get(`${API_URL}/category`),
         ]);
-
-        // tuỳ backend trả về, mình giữ nguyên logic cũ
         setCourses(courseRes.data || []);
         setCategories(categoryRes.data || []);
       } catch (e) {
@@ -36,8 +30,6 @@ export default function Courses() {
     };
     fetchData();
   }, []);
-
-  // Filter + search + sort (memo để mượt)
   const displayed = useMemo(() => {
     const matchCategory = (c) =>
       selectedCategory === "all" ||
@@ -45,7 +37,6 @@ export default function Courses() {
       c.category?._id === selectedCategory ||
       c.category?.name ===
         categories.find((cat) => cat._id === selectedCategory)?.name;
-
     const matchSearch = (c) => {
       const q = search.trim().toLowerCase();
       if (!q) return true;
@@ -55,9 +46,7 @@ export default function Courses() {
         c.teacher?.name?.toLowerCase().includes(q)
       );
     };
-
     let list = courses.filter((c) => matchCategory(c) && matchSearch(c));
-
     switch (sortBy) {
       case "priceAsc":
         list = [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
@@ -69,15 +58,12 @@ export default function Courses() {
         list = [...list].sort((a, b) => (b.students || 0) - (a.students || 0));
         break;
       default:
-        // newest
         list = [...list].sort(
           (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
         );
     }
     return list;
   }, [courses, categories, selectedCategory, search, sortBy]);
-
-  // Skeleton loader
   const Skeleton = () => (
     <div className="animate-pulse">
       <div className="h-44 rounded-2xl bg-orange-200/30" />
@@ -86,10 +72,9 @@ export default function Courses() {
       <div className="mt-4 h-9 w-28 rounded-full bg-orange-200/60" />
     </div>
   );
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white">
-      {/* Hero */}
+      {}
       <div className="relative">
         <div className="max-w-7xl mx-auto px-6 pt-10 pb-6">
           <div className="rounded-3xl bg-white/70 backdrop-blur shadow-sm ring-1 ring-orange-100 p-8">
@@ -97,8 +82,7 @@ export default function Courses() {
               Khám phá khoá học
             </h1>
             <p className="mt-2 text-gray-600"></p>
-
-            {/* Filter bar */}
+            {}
             <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center">
               <div className="flex-1 relative">
                 <input
@@ -122,8 +106,7 @@ export default function Courses() {
                 <option value="priceDesc">Giá giảm dần</option>
               </select>
             </div>
-
-            {/* Categories pill row */}
+            {}
             <div className="mt-6 overflow-x-auto">
               <div className="flex gap-2 py-1">
                 <button
@@ -156,15 +139,13 @@ export default function Courses() {
           </div>
         </div>
       </div>
-
-      {/* Content */}
+      {}
       <div className="max-w-7xl mx-auto px-6 pb-16">
         {err && (
           <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
             {err}
           </div>
         )}
-
         {loading ? (
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {Array.from({ length: 6 }).map((_, i) => (

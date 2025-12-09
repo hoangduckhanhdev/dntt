@@ -1,1071 +1,1 @@
-// src/pages/admin/AdminExamForm.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import axios from "axios";
-import examApi from "../../api/examApi";
-import examQuestionApi from "../../api/examQuestionApi";
-
-const API_BASE = "http://localhost:5000/api";
-
-export default function AdminExamForm() {
-  const { id } = useParams(); // edit có id, tạo mới thì undefined
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-
-  const isEdit = !!id;
-
-  /* =================== STATE CƠ BẢN =================== */
-  const [courses, setCourses] = useState([]);
-  const [loadingCourses, setLoadingCourses] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
-  const [loadingExam, setLoadingExam] = useState(false);
-
-  const [activeTab, setActiveTab] = useState("basic"); // 'basic' | 'questions'
-
-  const [form, setForm] = useState({
-    course: "",
-    title: "",
-    description: "",
-    type: "quiz", // quiz | exam | assignment
-    timeLimit: 30,
-    attemptsAllowed: 1,
-    shuffleQuestions: true,
-    shuffleOptions: true,
-    startAt: "", // datetime-local
-    dueAt: "", // datetime-local
-    skills: [], // danh sách skillId dùng cho AI
-  });
-
-  /* ============ SKILL MAP THEO KHOÁ HỌC ============ */
-  const [skills, setSkills] = useState([]);
-  const [loadingSkills, setLoadingSkills] = useState(false);
-
-  const fetchSkills = async (courseId) => {
-    if (!courseId) {
-      setSkills([]);
-      return;
-    }
-    try {
-      setLoadingSkills(true);
-      const token = localStorage.getItem("token");
-      const res = await axios.get(
-        `${API_BASE}/admin/skills?course=${courseId}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
-      );
-      const data = Array.isArray(res.data) ? res.data : [];
-      setSkills(data);
-    } catch (e) {
-      console.error("Không tải được danh sách skills:", e?.response?.data || e);
-      setSkills([]);
-    } finally {
-      setLoadingSkills(false);
-    }
-  };
-
-  /* =================== STATE CHỌN CÂU HỎI =================== */
-  const [questionMode, setQuestionMode] = useState("manual"); // manual | auto
-
-  // manual
-  const [questionBank, setQuestionBank] = useState([]);
-  const [loadingQuestions, setLoadingQuestions] = useState(false);
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
-
-  const [filters, setFilters] = useState({
-    chapter: "all",
-    tag: "all",
-    difficulty: "all",
-    search: "",
-  });
-
-  // auto config
-  const [autoConfig, setAutoConfig] = useState({
-    totalQuestions: 30,
-    difficultyDistribution: {
-      easy: 6,
-      medium: 14,
-      hard: 10,
-    },
-    chapters: [],
-    tags: [],
-  });
-
-  const courseFromQuery = searchParams.get("course");
-
-  /* =================== HANDLERS CƠ BẢN =================== */
-  const handleBasicChange = (field) => (e) => {
-    let value =
-      e.target.type === "checkbox" ? e.target.checked : e.target.value;
-
-    if (field === "timeLimit" || field === "attemptsAllowed") {
-      value = value === "" ? "" : Number(value);
-    }
-
-    if (field === "startAt" || field === "dueAt") {
-      setForm((prev) => ({ ...prev, [field]: value || "" }));
-      return;
-    }
-
-    if (field === "type") {
-      setForm((prev) => ({
-        ...prev,
-        type: value,
-        timeLimit: value === "assignment" ? 0 : prev.timeLimit || 30,
-      }));
-      return;
-    }
-
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // chọn nhiều skill
-  const handleSkillsChange = (e) => {
-    const options = Array.from(e.target.selectedOptions).map((opt) => opt.value);
-    setForm((prev) => ({ ...prev, skills: options }));
-  };
-
-  const handleChangeQuestionMode = (mode) => {
-    setQuestionMode(mode);
-  };
-
-  /* =================== LOAD COURSES =================== */
-  const fetchCourses = async () => {
-    try {
-      setLoadingCourses(true);
-      const token = localStorage.getItem("token");
-      const res = await axios.get(`${API_BASE}/admin/courses`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        params: { page: 1, limit: 1000 },
-      });
-
-      const data = res?.data;
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.data)
-        ? data.data
-        : Array.isArray(data?.items)
-        ? data.items
-        : [];
-
-      setCourses(list);
-    } catch (e) {
-      console.error(
-        "Không tải được danh sách khoá học:",
-        e?.response?.data || e
-      );
-    } finally {
-      setLoadingCourses(false);
-    }
-  };
-
-  /* =================== LOAD EXAM (EDIT) =================== */
-  const fetchExam = async () => {
-    if (!id) return;
-    try {
-      setLoadingExam(true);
-      setErr("");
-
-      const res = await examApi.admin.getExam(id);
-
-      const ex = res?.data || res;
-      if (!ex) {
-        console.warn("Không tìm thấy exam hoặc exam rỗng:", res);
-        setErr("Không tìm thấy đề thi hoặc dữ liệu rỗng.");
-        return;
-      }
-
-      const toLocalInput = (dateVal) => {
-        if (!dateVal) return "";
-        try {
-          const d = new Date(dateVal);
-          const pad = (n) => n.toString().padStart(2, "0");
-          const yyyy = d.getFullYear();
-          const mm = pad(d.getMonth() + 1);
-          const dd = pad(d.getDate());
-          const hh = pad(d.getHours());
-          const mi = pad(d.getMinutes());
-          return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-        } catch {
-          return "";
-        }
-      };
-
-      setForm((prev) => ({
-        ...prev,
-        course: ex.course?._id || ex.course || "",
-        title: ex.title || "",
-        description: ex.description || "",
-        type: ex.type || "quiz",
-        timeLimit: ex.timeLimit ?? 30,
-        attemptsAllowed: ex.attemptsAllowed ?? 1,
-        shuffleQuestions: !!ex.shuffleQuestions,
-        shuffleOptions: !!ex.shuffleOptions,
-        startAt: toLocalInput(ex.startAt),
-        dueAt: toLocalInput(ex.dueAt),
-        skills: Array.isArray(ex.skills)
-          ? ex.skills.map((s) => (typeof s === "string" ? s : s._id))
-          : [],
-      }));
-
-      setQuestionMode(ex.selectionMode || "manual");
-
-      if (Array.isArray(ex.questions)) {
-        const ids = ex.questions.map((q) => String(q._id || q));
-        setSelectedQuestionIds(ids);
-      } else {
-        setSelectedQuestionIds([]);
-      }
-
-      const ac = ex.autoConfig || {};
-      setAutoConfig({
-        totalQuestions: ac.totalQuestions || 30,
-        difficultyDistribution: {
-          easy: ac.difficultyDistribution?.easy ?? 0,
-          medium: ac.difficultyDistribution?.medium ?? 0,
-          hard: ac.difficultyDistribution?.hard ?? 0,
-        },
-        chapters: ac.chapters || [],
-        tags: ac.tags || [],
-      });
-    } catch (e) {
-      console.error("Lỗi load exam:", e?.response?.data || e);
-      setErr("Không tải được thông tin đề thi.");
-    } finally {
-      setLoadingExam(false);
-    }
-  };
-
-  /* =================== LOAD QUESTION BANK =================== */
-  const fetchQuestionBank = async () => {
-    if (!form.course) {
-      setQuestionBank([]);
-      return;
-    }
-    try {
-      setLoadingQuestions(true);
-
-      const params = {
-        course: form.course,
-        chapter: filters.chapter === "all" ? undefined : filters.chapter,
-        tag: filters.tag === "all" ? undefined : filters.tag,
-        difficulty:
-          filters.difficulty === "all" ? undefined : filters.difficulty,
-        q: filters.search || undefined,
-        page: 1,
-        limit: 500,
-      };
-
-      const res = await examQuestionApi.admin.getQuestions(params);
-
-      const items =
-        res?.items ||
-        res?.data?.items ||
-        (Array.isArray(res?.data) ? res.data : []) ||
-        [];
-
-      setQuestionBank(items);
-    } catch (e) {
-      console.error(
-        "Không tải được ngân hàng câu hỏi:",
-        e?.response?.data || e
-      );
-      setQuestionBank([]);
-    } finally {
-      setLoadingQuestions(false);
-    }
-  };
-
-  /* =================== EFFECTS =================== */
-  useEffect(() => {
-    fetchCourses();
-    fetchExam();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  useEffect(() => {
-    if (courseFromQuery && !form.course) {
-      setForm((prev) => ({ ...prev, course: courseFromQuery }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseFromQuery]);
-
-  // khi đổi course => load skills + (nếu đang ở tab questions) load question bank
-  useEffect(() => {
-    if (form.course) {
-      fetchSkills(form.course);
-    } else {
-      setSkills([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.course]);
-
-  // Khi đổi khoá học hoặc sang tab "questions" thì load ngân hàng
-  useEffect(() => {
-    if (activeTab === "questions" && form.course) {
-      fetchQuestionBank();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, form.course]);
-
-  /* =================== FILTER OPTIONS =================== */
-  const chapterOptions = useMemo(() => {
-    const set = new Set();
-    questionBank.forEach((q) => {
-      if (q.chapter) set.add(q.chapter);
-    });
-    return Array.from(set);
-  }, [questionBank]);
-
-  const tagOptions = useMemo(() => {
-    const set = new Set();
-    questionBank.forEach((q) => {
-      (q.tags || []).forEach((t) => t && set.add(t));
-    });
-    return Array.from(set);
-  }, [questionBank]);
-
-  const filteredQuestions = useMemo(() => {
-    return questionBank.filter((q) => {
-      if (
-        filters.chapter !== "all" &&
-        (q.chapter || "") !== filters.chapter
-      ) {
-        return false;
-      }
-      if (filters.tag !== "all") {
-        const tags = q.tags || [];
-        if (!tags.includes(filters.tag)) return false;
-      }
-      if (filters.difficulty !== "all") {
-        if ((q.difficulty || "medium") !== filters.difficulty) return false;
-      }
-      if (filters.search.trim()) {
-        const s = filters.search.trim().toLowerCase();
-        if (!q.content?.toLowerCase().includes(s)) return false;
-      }
-      return true;
-    });
-  }, [questionBank, filters]);
-
-  /* =================== HANDLERS QUESTION TAB =================== */
-  const toggleQuestionSelected = (id) => {
-    const idStr = String(id);
-    setSelectedQuestionIds((prev) =>
-      prev.includes(idStr) ? prev.filter((x) => x !== idStr) : [...prev, idStr]
-    );
-  };
-
-  const handleFilterChange = (field) => (e) => {
-    setFilters((prev) => ({ ...prev, [field]: e.target.value }));
-  };
-
-  const handleAutoConfigChange = (field, nested) => (e) => {
-    const value = e.target.value;
-    if (field === "difficultyDistribution") {
-      setAutoConfig((prev) => ({
-        ...prev,
-        difficultyDistribution: {
-          ...prev.difficultyDistribution,
-          [nested]: value === "" ? "" : Number(value),
-        },
-      }));
-    } else if (field === "totalQuestions") {
-      setAutoConfig((prev) => ({
-        ...prev,
-        totalQuestions: value === "" ? "" : Number(value),
-      }));
-    } else if (field === "chapters" || field === "tags") {
-      const options = Array.from(e.target.selectedOptions).map(
-        (opt) => opt.value
-      );
-      setAutoConfig((prev) => ({ ...prev, [field]: options }));
-    }
-  };
-
-  /* =================== SUBMIT =================== */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.course) {
-      alert("Vui lòng chọn khoá học.");
-      return;
-    }
-    if (!form.title.trim()) {
-      alert("Vui lòng nhập tiêu đề đề thi.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setErr("");
-
-      const basicPayload = {
-        course: form.course,
-        title: form.title.trim(),
-        description: form.description.trim(),
-        type: form.type,
-        timeLimit:
-          form.type === "assignment" ? null : Number(form.timeLimit || 0),
-        attemptsAllowed: Number(form.attemptsAllowed || 1),
-        shuffleQuestions: !!form.shuffleQuestions,
-        shuffleOptions: !!form.shuffleOptions,
-        startAt: form.startAt || null,
-        dueAt: form.dueAt || null,
-        skills: form.skills || [], // ✅ gửi kèm danh sách kỹ năng
-      };
-
-      let payload;
-
-      if (questionMode === "manual") {
-        payload = {
-          ...basicPayload,
-          selectionMode: "manual",
-          questions: selectedQuestionIds,
-          autoConfig: undefined,
-        };
-      } else {
-        payload = {
-          ...basicPayload,
-          selectionMode: "auto",
-          questions: [],
-          autoConfig: {
-            totalQuestions: Number(autoConfig.totalQuestions || 0),
-            chapters: autoConfig.chapters,
-            tags: autoConfig.tags,
-            difficultyDistribution: {
-              easy: Number(autoConfig.difficultyDistribution.easy || 0),
-              medium: Number(autoConfig.difficultyDistribution.medium || 0),
-              hard: Number(autoConfig.difficultyDistribution.hard || 0),
-            },
-          },
-        };
-      }
-
-      if (isEdit) {
-        await examApi.admin.updateExam(id, payload);
-      } else {
-        await examApi.admin.createExam(payload);
-      }
-
-      navigate("/admin/exams");
-    } catch (e) {
-      console.error("Lưu đề thi thất bại:", e?.response?.data || e);
-      setErr("Lưu đề thi thất bại.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  /* =================== RENDER =================== */
-
-  return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-800 mb-1">
-        {isEdit ? "Chỉnh sửa đề thi" : "Tạo đề thi mới"}
-      </h1>
-      <p className="text-sm text-slate-500 mb-4">
-        Cấu hình đề thi, sau đó chọn câu hỏi (manual) hoặc để hệ thống AI chọn
-        tự động.
-      </p>
-
-      {err && (
-        <p className="text-sm text-red-500 mb-3 bg-red-50 px-3 py-2 rounded-lg">
-          {err}
-        </p>
-      )}
-
-      {isEdit && loadingExam && (
-        <p className="text-sm text-slate-500 mb-3">Đang tải đề thi...</p>
-      )}
-
-      {/* Tabs */}
-      <div className="border-b border-slate-200 mb-4 flex gap-6">
-        <button
-          type="button"
-          onClick={() => setActiveTab("basic")}
-          className={`pb-2 text-sm font-medium ${
-            activeTab === "basic"
-              ? "text-orange-600 border-b-2 border-orange-500"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          Cơ bản
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("questions")}
-          className={`pb-2 text-sm font-medium flex items-center gap-1 ${
-            activeTab === "questions"
-              ? "text-orange-600 border-b-2 border-orange-500"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <span>🔀</span> <span>Câu hỏi &amp; AI config</span>
-        </button>
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-xl shadow-soft border border-slate-100 p-5 space-y-4"
-      >
-        {/* ================= TAB CƠ BẢN ================= */}
-        {activeTab === "basic" && (
-          <>
-            {/* Course */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Khoá học <span className="text-red-500">*</span>
-              </label>
-              <select
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                value={form.course}
-                onChange={handleBasicChange("course")}
-              >
-                <option value="">-- Chọn khoá học --</option>
-                {courses.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.title || c.name}
-                  </option>
-                ))}
-              </select>
-              {loadingCourses && (
-                <p className="text-xs text-slate-400 mt-1">
-                  Đang tải khoá học...
-                </p>
-              )}
-            </div>
-
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Tiêu đề đề thi <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                value={form.title}
-                onChange={handleBasicChange("title")}
-                placeholder="Ví dụ: Quiz chương 1, Thi giữa kỳ,..."
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Mô tả
-              </label>
-              <textarea
-                rows={3}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                value={form.description}
-                onChange={handleBasicChange("description")}
-                placeholder="Ghi chú cho học viên về nội dung, phạm vi đề thi / bài tập..."
-              />
-            </div>
-
-            {/* Type + time + attempts */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Loại đề
-                </label>
-                <select
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                  value={form.type}
-                  onChange={handleBasicChange("type")}
-                >
-                  <option value="quiz">Quiz / kiểm tra chương</option>
-                  <option value="exam">Thi giữa kỳ / cuối kỳ</option>
-                  <option value="assignment">
-                    Bài tập (tự luận / nộp file)
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Thời gian (phút)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                  value={
-                    form.type === "assignment" || form.timeLimit === null
-                      ? ""
-                      : form.timeLimit
-                  }
-                  onChange={handleBasicChange("timeLimit")}
-                  disabled={form.type === "assignment"}
-                  placeholder={
-                    form.type === "assignment"
-                      ? "Bài tập về nhà: không giới hạn, tính theo hạn nộp"
-                      : "0 = không giới hạn thời gian"
-                  }
-                />
-                {form.type !== "assignment" && (
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    0 = không giới hạn thời gian
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Số lần làm
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                  value={form.attemptsAllowed}
-                  onChange={handleBasicChange("attemptsAllowed")}
-                />
-              </div>
-            </div>
-
-            {/* Start / Due datetime */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Thời gian bắt đầu
-                </label>
-                <input
-                  type="datetime-local"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                  value={form.startAt}
-                  onChange={handleBasicChange("startAt")}
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Để trống = mở ngay lập tức khi đề được công bố.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Hạn nộp bài
-                </label>
-                <input
-                  type="datetime-local"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                  value={form.dueAt}
-                  onChange={handleBasicChange("dueAt")}
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Để trống = không có hạn nộp.
-                </p>
-              </div>
-            </div>
-
-            {/* Shuffle */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={form.shuffleQuestions}
-                  onChange={handleBasicChange("shuffleQuestions")}
-                  className="rounded border-slate-300"
-                />
-                Xáo trộn thứ tự câu hỏi
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={form.shuffleOptions}
-                  onChange={handleBasicChange("shuffleOptions")}
-                  className="rounded border-slate-300"
-                />
-                Xáo trộn thứ tự đáp án
-              </label>
-            </div>
-
-            {/* ✅ SKILL MAP CHO ĐỀ NÀY */}
-            <div className="mt-4 border-t border-slate-100 pt-4">
-              <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-1">
-                <span>🧠 Skill Map cho đề thi</span>
-                <span className="text-[11px] font-normal text-slate-400">
-                  (Dùng cho AI phân tích kết quả & gợi ý học tập)
-                </span>
-              </h3>
-              {form.course ? (
-                <>
-                  <select
-                    multiple
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-orange-300"
-                    value={form.skills}
-                    onChange={handleSkillsChange}
-                  >
-                    {skills.length === 0 && (
-                      <option value="">(Chưa có kỹ năng cho khoá này)</option>
-                    )}
-                    {skills.map((s) => (
-                      <option key={s._id} value={s._id}>
-                        {s.name}
-                        {s.level ? ` – ${s.level}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Chọn các kỹ năng mà đề này đang kiểm tra. AI sẽ dựa vào đây
-                    để sinh báo cáo kỹ năng sau mỗi lần làm bài.
-                  </p>
-                  {loadingSkills && (
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Đang tải danh sách kỹ năng...
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-xs text-slate-500">
-                  Vui lòng chọn khoá học trước để chọn skill.
-                </p>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* ================ TAB CÂU HỎI & AI CONFIG ================ */}
-        {activeTab === "questions" && (
-          <>
-            {/* Mode toggle */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <span>Chế độ chọn câu hỏi:</span>
-                <div className="inline-flex rounded-full bg-slate-100 p-1">
-                  <button
-                    type="button"
-                    onClick={() => handleChangeQuestionMode("manual")}
-                    className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 ${
-                      questionMode === "manual"
-                        ? "bg-white shadow text-orange-600"
-                        : "text-slate-500"
-                    }`}
-                  >
-                    <span>📋</span> Manual
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleChangeQuestionMode("auto")}
-                    className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 ${
-                      questionMode === "auto"
-                        ? "bg-white shadow text-orange-600"
-                        : "text-slate-500"
-                    }`}
-                  >
-                    <span>🤖</span> Auto AI
-                  </button>
-                </div>
-              </div>
-
-              {questionMode === "manual" && (
-                <div className="text-xs text-slate-500">
-                  Đã chọn{" "}
-                  <span className="font-semibold text-orange-600">
-                    {selectedQuestionIds.length}
-                  </span>{" "}
-                  câu hỏi
-                </div>
-              )}
-            </div>
-
-            {/* MANUAL MODE */}
-            {questionMode === "manual" && (
-              <div className="border border-slate-100 rounded-xl bg-slate-50/60 p-3 space-y-3">
-                {!form.course && (
-                  <p className="text-sm text-slate-500">
-                    Vui lòng chọn khoá học ở tab "Cơ bản" trước để tải ngân hàng
-                    câu hỏi.
-                  </p>
-                )}
-
-                {form.course && (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        className="border border-slate-200 rounded-lg px-2 py-1 text-xs"
-                        value={filters.chapter}
-                        onChange={handleFilterChange("chapter")}
-                      >
-                        <option value="all">Chương (tất cả)</option>
-                        {chapterOptions.map((ch) => (
-                          <option key={ch} value={ch}>
-                            {ch}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        className="border border-slate-200 rounded-lg px-2 py-1 text-xs"
-                        value={filters.tag}
-                        onChange={handleFilterChange("tag")}
-                      >
-                        <option value="all">Tag (tất cả)</option>
-                        {tagOptions.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        className="border border-slate-200 rounded-lg px-2 py-1 text-xs"
-                        value={filters.difficulty}
-                        onChange={handleFilterChange("difficulty")}
-                      >
-                        <option value="all">Độ khó (tất cả)</option>
-                        <option value="easy">Dễ</option>
-                        <option value="medium">Trung bình</option>
-                        <option value="hard">Khó</option>
-                      </select>
-
-                      <div className="flex-1 min-w-[180px]">
-                        <input
-                          className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs"
-                          placeholder="Tìm theo nội dung..."
-                          value={filters.search}
-                          onChange={handleFilterChange("search")}
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={fetchQuestionBank}
-                        className="px-2 py-1 text-xs border border-slate-200 rounded-lg hover:bg-slate-100"
-                      >
-                        ↻
-                      </button>
-                    </div>
-
-                    <div className="mt-2 border border-slate-200 rounded-lg bg-white max-h-[360px] overflow-y-auto">
-                      {loadingQuestions && (
-                        <p className="text-xs text-slate-500 px-3 py-2">
-                          Đang tải câu hỏi...
-                        </p>
-                      )}
-
-                      {!loadingQuestions && filteredQuestions.length === 0 && (
-                        <p className="text-xs text-slate-500 px-3 py-2">
-                          Chưa có câu hỏi nào trong ngân hàng cho khoá học
-                          này.
-                        </p>
-                      )}
-
-                      {!loadingQuestions &&
-                        filteredQuestions.map((q) => {
-                          const checked = selectedQuestionIds.includes(
-                            String(q._id)
-                          );
-                          return (
-                            <label
-                              key={q._id}
-                              className="flex items-start gap-2 px-3 py-2 border-b border-slate-50 text-sm hover:bg-slate-50 cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() =>
-                                  toggleQuestionSelected(q._id)
-                                }
-                                className="mt-1"
-                              />
-                              <div className="flex-1">
-                                <div className="text-slate-800">
-                                  {q.content}
-                                </div>
-                                <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap gap-2">
-                                  {q.chapter && (
-                                    <span>📘 Chương: {q.chapter}</span>
-                                  )}
-                                  {q.difficulty && (
-                                    <span>
-                                      🎯 Độ khó:{" "}
-                                      {q.difficulty === "easy"
-                                        ? "Dễ"
-                                        : q.difficulty === "hard"
-                                        ? "Khó"
-                                        : "Trung bình"}
-                                    </span>
-                                  )}
-                                  {q.tags && q.tags.length > 0 && (
-                                    <span>
-                                      🔖 Tags: {q.tags.join(", ")}
-                                    </span>
-                                  )}
-                                  <span>⏱ Điểm: {q.score || 1}</span>
-                                </div>
-                              </div>
-                            </label>
-                          );
-                        })}
-                    </div>
-
-                    <p className="text-xs text-slate-500 mt-2">
-                      Bạn đang chọn thủ công{" "}
-                      <span className="font-semibold text-orange-600">
-                        {selectedQuestionIds.length}
-                      </span>{" "}
-                      câu hỏi cho đề này.
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* AUTO MODE */}
-            {questionMode === "auto" && (
-              <div className="border border-slate-100 rounded-xl bg-slate-50/60 p-4 space-y-4">
-                <p className="text-sm text-slate-600">
-                  Hệ thống sẽ dùng cấu hình dưới đây để rút câu hỏi ngẫu nhiên
-                  từ ngân hàng khi học viên bắt đầu làm bài. Bạn có thể điều
-                  chỉnh theo chương, tag và độ khó.
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Tổng số câu
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                      value={autoConfig.totalQuestions}
-                      onChange={handleAutoConfigChange("totalQuestions")}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Phân bố độ khó (số câu)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-slate-500">Dễ</span>
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300"
-                          value={autoConfig.difficultyDistribution.easy}
-                          onChange={handleAutoConfigChange(
-                            "difficultyDistribution",
-                            "easy"
-                          )}
-                        />
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-slate-500">TB</span>
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300"
-                          value={autoConfig.difficultyDistribution.medium}
-                          onChange={handleAutoConfigChange(
-                            "difficultyDistribution",
-                            "medium"
-                          )}
-                        />
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-slate-500">Khó</span>
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300"
-                          value={autoConfig.difficultyDistribution.hard}
-                          onChange={handleAutoConfigChange(
-                            "difficultyDistribution",
-                            "hard"
-                          )}
-                        />
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Nên để tổng (Dễ + TB + Khó) ≤ Tổng số câu. Nếu ít hơn,
-                      hệ thống sẽ tự bù thêm câu ngẫu nhiên.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Chương áp dụng
-                    </label>
-                    <select
-                      multiple
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-orange-300"
-                      value={autoConfig.chapters}
-                      onChange={handleAutoConfigChange("chapters")}
-                    >
-                      {chapterOptions.length === 0 && (
-                        <option value="">(Không có dữ liệu chương)</option>
-                      )}
-                      {chapterOptions.map((ch) => (
-                        <option key={ch} value={ch}>
-                          {ch}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Bỏ trống = dùng tất cả chương có trong ngân hàng.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Tags áp dụng
-                    </label>
-                    <select
-                      multiple
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-orange-300"
-                      value={autoConfig.tags}
-                      onChange={handleAutoConfigChange("tags")}
-                    >
-                      {tagOptions.length === 0 && (
-                        <option value="">(Không có dữ liệu tag)</option>
-                      )}
-                      {tagOptions.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Bỏ trống = dùng tất cả tags.
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-500">
-                  Hệ thống sẽ tự rút{" "}
-                  <span className="font-semibold">
-                    {autoConfig.totalQuestions || 0}
-                  </span>{" "}
-                  câu theo cấu hình AI ở trên mỗi lần mở đề.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* FOOTER BUTTONS */}
-        <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/exams")}
-            className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50"
-          >
-            Hủy
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 disabled:opacity-60"
-          >
-            {saving ? "Đang lưu..." : isEdit ? "Lưu đề thi" : "Tạo đề thi"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
+import React, { useEffect, useMemo, useState } from "react";import { useNavigate, useParams, useSearchParams } from "react-router-dom";import axios from "axios";import examApi from "../../api/examApi";import examQuestionApi from "../../api/examQuestionApi";const API_BASE = "http://localhost:5000/api";export default function AdminExamForm() {  const { id } = useParams();   const [searchParams] = useSearchParams();  const navigate = useNavigate();  const isEdit = !!id;  const [courses, setCourses] = useState([]);  const [loadingCourses, setLoadingCourses] = useState(false);  const [saving, setSaving] = useState(false);  const [err, setErr] = useState("");  const [loadingExam, setLoadingExam] = useState(false);  const [activeTab, setActiveTab] = useState("basic");   const [form, setForm] = useState({    course: "",    title: "",    description: "",    type: "quiz",     timeLimit: 30,    attemptsAllowed: 1,    shuffleQuestions: true,    shuffleOptions: true,    startAt: "",     dueAt: "",     skills: [],   });  const [skills, setSkills] = useState([]);  const [loadingSkills, setLoadingSkills] = useState(false);  const fetchSkills = async (courseId) => {    if (!courseId) {      setSkills([]);      return;    }    try {      setLoadingSkills(true);      const token = localStorage.getItem("token");      const res = await axios.get(        `${API_BASE}/admin/skills?course=${courseId}`,        {          headers: token ? { Authorization: `Bearer ${token}` } : {},        }      );      const data = Array.isArray(res.data) ? res.data : [];      setSkills(data);    } catch (e) {      console.error("Không tải được danh sách skills:", e?.response?.data || e);      setSkills([]);    } finally {      setLoadingSkills(false);    }  };  const [questionMode, setQuestionMode] = useState("manual");   const [questionBank, setQuestionBank] = useState([]);  const [loadingQuestions, setLoadingQuestions] = useState(false);  const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);  const [filters, setFilters] = useState({    chapter: "all",    tag: "all",    difficulty: "all",    search: "",  });  const [autoConfig, setAutoConfig] = useState({    totalQuestions: 30,    difficultyDistribution: {      easy: 6,      medium: 14,      hard: 10,    },    chapters: [],    tags: [],  });  const courseFromQuery = searchParams.get("course");  const handleBasicChange = (field) => (e) => {    let value =      e.target.type === "checkbox" ? e.target.checked : e.target.value;    if (field === "timeLimit" || field === "attemptsAllowed") {      value = value === "" ? "" : Number(value);    }    if (field === "startAt" || field === "dueAt") {      setForm((prev) => ({ ...prev, [field]: value || "" }));      return;    }    if (field === "type") {      setForm((prev) => ({        ...prev,        type: value,        timeLimit: value === "assignment" ? 0 : prev.timeLimit || 30,      }));      return;    }    setForm((prev) => ({ ...prev, [field]: value }));  };  const handleSkillsChange = (e) => {    const options = Array.from(e.target.selectedOptions).map((opt) => opt.value);    setForm((prev) => ({ ...prev, skills: options }));  };  const handleChangeQuestionMode = (mode) => {    setQuestionMode(mode);  };  const fetchCourses = async () => {    try {      setLoadingCourses(true);      const token = localStorage.getItem("token");      const res = await axios.get(`${API_BASE}/admin/courses`, {        headers: token ? { Authorization: `Bearer ${token}` } : {},        params: { page: 1, limit: 1000 },      });      const data = res?.data;      const list = Array.isArray(data)        ? data        : Array.isArray(data?.data)        ? data.data        : Array.isArray(data?.items)        ? data.items        : [];      setCourses(list);    } catch (e) {      console.error(        "Không tải được danh sách khoá học:",        e?.response?.data || e      );    } finally {      setLoadingCourses(false);    }  };  const fetchExam = async () => {    if (!id) return;    try {      setLoadingExam(true);      setErr("");      const res = await examApi.admin.getExam(id);      const ex = res?.data || res;      if (!ex) {        console.warn("Không tìm thấy exam hoặc exam rỗng:", res);        setErr("Không tìm thấy đề thi hoặc dữ liệu rỗng.");        return;      }      const toLocalInput = (dateVal) => {        if (!dateVal) return "";        try {          const d = new Date(dateVal);          const pad = (n) => n.toString().padStart(2, "0");          const yyyy = d.getFullYear();          const mm = pad(d.getMonth() + 1);          const dd = pad(d.getDate());          const hh = pad(d.getHours());          const mi = pad(d.getMinutes());          return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;        } catch {          return "";        }      };      setForm((prev) => ({        ...prev,        course: ex.course?._id || ex.course || "",        title: ex.title || "",        description: ex.description || "",        type: ex.type || "quiz",        timeLimit: ex.timeLimit ?? 30,        attemptsAllowed: ex.attemptsAllowed ?? 1,        shuffleQuestions: !!ex.shuffleQuestions,        shuffleOptions: !!ex.shuffleOptions,        startAt: toLocalInput(ex.startAt),        dueAt: toLocalInput(ex.dueAt),        skills: Array.isArray(ex.skills)          ? ex.skills.map((s) => (typeof s === "string" ? s : s._id))          : [],      }));      setQuestionMode(ex.selectionMode || "manual");      if (Array.isArray(ex.questions)) {        const ids = ex.questions.map((q) => String(q._id || q));        setSelectedQuestionIds(ids);      } else {        setSelectedQuestionIds([]);      }      const ac = ex.autoConfig || {};      setAutoConfig({        totalQuestions: ac.totalQuestions || 30,        difficultyDistribution: {          easy: ac.difficultyDistribution?.easy ?? 0,          medium: ac.difficultyDistribution?.medium ?? 0,          hard: ac.difficultyDistribution?.hard ?? 0,        },        chapters: ac.chapters || [],        tags: ac.tags || [],      });    } catch (e) {      console.error("Lỗi load exam:", e?.response?.data || e);      setErr("Không tải được thông tin đề thi.");    } finally {      setLoadingExam(false);    }  };  const fetchQuestionBank = async () => {    if (!form.course) {      setQuestionBank([]);      return;    }    try {      setLoadingQuestions(true);      const params = {        course: form.course,        chapter: filters.chapter === "all" ? undefined : filters.chapter,        tag: filters.tag === "all" ? undefined : filters.tag,        difficulty:          filters.difficulty === "all" ? undefined : filters.difficulty,        q: filters.search || undefined,        page: 1,        limit: 500,      };      const res = await examQuestionApi.admin.getQuestions(params);      const items =        res?.items ||        res?.data?.items ||        (Array.isArray(res?.data) ? res.data : []) ||        [];      setQuestionBank(items);    } catch (e) {      console.error(        "Không tải được ngân hàng câu hỏi:",        e?.response?.data || e      );      setQuestionBank([]);    } finally {      setLoadingQuestions(false);    }  };  useEffect(() => {    fetchCourses();    fetchExam();  }, [id]);  useEffect(() => {    if (courseFromQuery && !form.course) {      setForm((prev) => ({ ...prev, course: courseFromQuery }));    }  }, [courseFromQuery]);  useEffect(() => {    if (form.course) {      fetchSkills(form.course);    } else {      setSkills([]);    }  }, [form.course]);  useEffect(() => {    if (activeTab === "questions" && form.course) {      fetchQuestionBank();    }  }, [activeTab, form.course]);  const chapterOptions = useMemo(() => {    const set = new Set();    questionBank.forEach((q) => {      if (q.chapter) set.add(q.chapter);    });    return Array.from(set);  }, [questionBank]);  const tagOptions = useMemo(() => {    const set = new Set();    questionBank.forEach((q) => {      (q.tags || []).forEach((t) => t && set.add(t));    });    return Array.from(set);  }, [questionBank]);  const filteredQuestions = useMemo(() => {    return questionBank.filter((q) => {      if (        filters.chapter !== "all" &&        (q.chapter || "") !== filters.chapter      ) {        return false;      }      if (filters.tag !== "all") {        const tags = q.tags || [];        if (!tags.includes(filters.tag)) return false;      }      if (filters.difficulty !== "all") {        if ((q.difficulty || "medium") !== filters.difficulty) return false;      }      if (filters.search.trim()) {        const s = filters.search.trim().toLowerCase();        if (!q.content?.toLowerCase().includes(s)) return false;      }      return true;    });  }, [questionBank, filters]);  const toggleQuestionSelected = (id) => {    const idStr = String(id);    setSelectedQuestionIds((prev) =>      prev.includes(idStr) ? prev.filter((x) => x !== idStr) : [...prev, idStr]    );  };  const handleFilterChange = (field) => (e) => {    setFilters((prev) => ({ ...prev, [field]: e.target.value }));  };  const handleAutoConfigChange = (field, nested) => (e) => {    const value = e.target.value;    if (field === "difficultyDistribution") {      setAutoConfig((prev) => ({        ...prev,        difficultyDistribution: {          ...prev.difficultyDistribution,          [nested]: value === "" ? "" : Number(value),        },      }));    } else if (field === "totalQuestions") {      setAutoConfig((prev) => ({        ...prev,        totalQuestions: value === "" ? "" : Number(value),      }));    } else if (field === "chapters" || field === "tags") {      const options = Array.from(e.target.selectedOptions).map(        (opt) => opt.value      );      setAutoConfig((prev) => ({ ...prev, [field]: options }));    }  };  const handleSubmit = async (e) => {    e.preventDefault();    if (!form.course) {      alert("Vui lòng chọn khoá học.");      return;    }    if (!form.title.trim()) {      alert("Vui lòng nhập tiêu đề đề thi.");      return;    }    try {      setSaving(true);      setErr("");      const basicPayload = {        course: form.course,        title: form.title.trim(),        description: form.description.trim(),        type: form.type,        timeLimit:          form.type === "assignment" ? null : Number(form.timeLimit || 0),        attemptsAllowed: Number(form.attemptsAllowed || 1),        shuffleQuestions: !!form.shuffleQuestions,        shuffleOptions: !!form.shuffleOptions,        startAt: form.startAt || null,        dueAt: form.dueAt || null,        skills: form.skills || [],       };      let payload;      if (questionMode === "manual") {        payload = {          ...basicPayload,          selectionMode: "manual",          questions: selectedQuestionIds,          autoConfig: undefined,        };      } else {        payload = {          ...basicPayload,          selectionMode: "auto",          questions: [],          autoConfig: {            totalQuestions: Number(autoConfig.totalQuestions || 0),            chapters: autoConfig.chapters,            tags: autoConfig.tags,            difficultyDistribution: {              easy: Number(autoConfig.difficultyDistribution.easy || 0),              medium: Number(autoConfig.difficultyDistribution.medium || 0),              hard: Number(autoConfig.difficultyDistribution.hard || 0),            },          },        };      }      if (isEdit) {        await examApi.admin.updateExam(id, payload);      } else {        await examApi.admin.createExam(payload);      }      navigate("/admin/exams");    } catch (e) {      console.error("Lưu đề thi thất bại:", e?.response?.data || e);      setErr("Lưu đề thi thất bại.");    } finally {      setSaving(false);    }  };  return (    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto">      <h1 className="text-2xl font-bold text-slate-800 mb-1">        {isEdit ? "Chỉnh sửa đề thi" : "Tạo đề thi mới"}      </h1>      <p className="text-sm text-slate-500 mb-4">        Cấu hình đề thi, sau đó chọn câu hỏi (manual) hoặc để hệ thống AI chọn        tự động.      </p>      {err && (        <p className="text-sm text-red-500 mb-3 bg-red-50 px-3 py-2 rounded-lg">          {err}        </p>      )}      {isEdit && loadingExam && (        <p className="text-sm text-slate-500 mb-3">Đang tải đề thi...</p>      )}      {}      <div className="border-b border-slate-200 mb-4 flex gap-6">        <button          type="button"          onClick={() => setActiveTab("basic")}          className={`pb-2 text-sm font-medium ${            activeTab === "basic"              ? "text-orange-600 border-b-2 border-orange-500"              : "text-slate-500 hover:text-slate-700"          }`}        >          Cơ bản        </button>        <button          type="button"          onClick={() => setActiveTab("questions")}          className={`pb-2 text-sm font-medium flex items-center gap-1 ${            activeTab === "questions"              ? "text-orange-600 border-b-2 border-orange-500"              : "text-slate-500 hover:text-slate-700"          }`}        >          <span>🔀</span> <span>Câu hỏi &amp; AI config</span>        </button>      </div>      <form        onSubmit={handleSubmit}        className="bg-white rounded-xl shadow-soft border border-slate-100 p-5 space-y-4"      >        {}        {activeTab === "basic" && (          <>            {}            <div>              <label className="block text-sm font-medium text-slate-700 mb-1">                Khoá học <span className="text-red-500">*</span>              </label>              <select                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                value={form.course}                onChange={handleBasicChange("course")}              >                <option value="">-- Chọn khoá học --</option>                {courses.map((c) => (                  <option key={c._id} value={c._id}>                    {c.title || c.name}                  </option>                ))}              </select>              {loadingCourses && (                <p className="text-xs text-slate-400 mt-1">                  Đang tải khoá học...                </p>              )}            </div>            {}            <div>              <label className="block text-sm font-medium text-slate-700 mb-1">                Tiêu đề đề thi <span className="text-red-500">*</span>              </label>              <input                type="text"                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                value={form.title}                onChange={handleBasicChange("title")}                placeholder="Ví dụ: Quiz chương 1, Thi giữa kỳ,..."              />            </div>            {}            <div>              <label className="block text-sm font-medium text-slate-700 mb-1">                Mô tả              </label>              <textarea                rows={3}                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                value={form.description}                onChange={handleBasicChange("description")}                placeholder="Ghi chú cho học viên về nội dung, phạm vi đề thi / bài tập..."              />            </div>            {}            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">              <div>                <label className="block text-sm font-medium text-slate-700 mb-1">                  Loại đề                </label>                <select                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                  value={form.type}                  onChange={handleBasicChange("type")}                >                  <option value="quiz">Quiz / kiểm tra chương</option>                  <option value="exam">Thi giữa kỳ / cuối kỳ</option>                  <option value="assignment">                    Bài tập (tự luận / nộp file)                  </option>                </select>              </div>              <div>                <label className="block text-sm font-medium text-slate-700 mb-1">                  Thời gian (phút)                </label>                <input                  type="number"                  min={0}                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                  value={                    form.type === "assignment" || form.timeLimit === null                      ? ""                      : form.timeLimit                  }                  onChange={handleBasicChange("timeLimit")}                  disabled={form.type === "assignment"}                  placeholder={                    form.type === "assignment"                      ? "Bài tập về nhà: không giới hạn, tính theo hạn nộp"                      : "0 = không giới hạn thời gian"                  }                />                {form.type !== "assignment" && (                  <p className="text-[11px] text-slate-400 mt-0.5">                    0 = không giới hạn thời gian                  </p>                )}              </div>              <div>                <label className="block text-sm font-medium text-slate-700 mb-1">                  Số lần làm                </label>                <input                  type="number"                  min={1}                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                  value={form.attemptsAllowed}                  onChange={handleBasicChange("attemptsAllowed")}                />              </div>            </div>            {}            <div className="grid md:grid-cols-2 gap-4">              <div>                <label className="block text-sm font-medium text-slate-700 mb-1">                  Thời gian bắt đầu                </label>                <input                  type="datetime-local"                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                  value={form.startAt}                  onChange={handleBasicChange("startAt")}                />                <p className="text-xs text-slate-500 mt-1">                  Để trống = mở ngay lập tức khi đề được công bố.                </p>              </div>              <div>                <label className="block text-sm font-medium text-slate-700 mb-1">                  Hạn nộp bài                </label>                <input                  type="datetime-local"                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                  value={form.dueAt}                  onChange={handleBasicChange("dueAt")}                />                <p className="text-xs text-slate-500 mt-1">                  Để trống = không có hạn nộp.                </p>              </div>            </div>            {}            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">              <label className="inline-flex items-center gap-2 text-sm text-slate-700">                <input                  type="checkbox"                  checked={form.shuffleQuestions}                  onChange={handleBasicChange("shuffleQuestions")}                  className="rounded border-slate-300"                />                Xáo trộn thứ tự câu hỏi              </label>              <label className="inline-flex items-center gap-2 text-sm text-slate-700">                <input                  type="checkbox"                  checked={form.shuffleOptions}                  onChange={handleBasicChange("shuffleOptions")}                  className="rounded border-slate-300"                />                Xáo trộn thứ tự đáp án              </label>            </div>            {}            <div className="mt-4 border-t border-slate-100 pt-4">              <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-1">                <span>🧠 Skill Map cho đề thi</span>                <span className="text-[11px] font-normal text-slate-400">                  (Dùng cho AI phân tích kết quả & gợi ý học tập)                </span>              </h3>              {form.course ? (                <>                  <select                    multiple                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-orange-300"                    value={form.skills}                    onChange={handleSkillsChange}                  >                    {skills.length === 0 && (                      <option value="">(Chưa có kỹ năng cho khoá này)</option>                    )}                    {skills.map((s) => (                      <option key={s._id} value={s._id}>                        {s.name}                        {s.level ? ` – ${s.level}` : ""}                      </option>                    ))}                  </select>                  <p className="text-[11px] text-slate-400 mt-1">                    Chọn các kỹ năng mà đề này đang kiểm tra. AI sẽ dựa vào đây                    để sinh báo cáo kỹ năng sau mỗi lần làm bài.                  </p>                  {loadingSkills && (                    <p className="text-[11px] text-slate-400 mt-1">                      Đang tải danh sách kỹ năng...                    </p>                  )}                </>              ) : (                <p className="text-xs text-slate-500">                  Vui lòng chọn khoá học trước để chọn skill.                </p>              )}            </div>          </>        )}        {}        {activeTab === "questions" && (          <>            {}            <div className="flex items-center justify-between mb-3">              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">                <span>Chế độ chọn câu hỏi:</span>                <div className="inline-flex rounded-full bg-slate-100 p-1">                  <button                    type="button"                    onClick={() => handleChangeQuestionMode("manual")}                    className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 ${                      questionMode === "manual"                        ? "bg-white shadow text-orange-600"                        : "text-slate-500"                    }`}                  >                    <span>📋</span> Manual                  </button>                  <button                    type="button"                    onClick={() => handleChangeQuestionMode("auto")}                    className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 ${                      questionMode === "auto"                        ? "bg-white shadow text-orange-600"                        : "text-slate-500"                    }`}                  >                    <span>🤖</span> Auto AI                  </button>                </div>              </div>              {questionMode === "manual" && (                <div className="text-xs text-slate-500">                  Đã chọn{" "}                  <span className="font-semibold text-orange-600">                    {selectedQuestionIds.length}                  </span>{" "}                  câu hỏi                </div>              )}            </div>            {}            {questionMode === "manual" && (              <div className="border border-slate-100 rounded-xl bg-slate-50/60 p-3 space-y-3">                {!form.course && (                  <p className="text-sm text-slate-500">                    Vui lòng chọn khoá học ở tab "Cơ bản" trước để tải ngân hàng                    câu hỏi.                  </p>                )}                {form.course && (                  <>                    <div className="flex flex-wrap items-center gap-2">                      <select                        className="border border-slate-200 rounded-lg px-2 py-1 text-xs"                        value={filters.chapter}                        onChange={handleFilterChange("chapter")}                      >                        <option value="all">Chương (tất cả)</option>                        {chapterOptions.map((ch) => (                          <option key={ch} value={ch}>                            {ch}                          </option>                        ))}                      </select>                      <select                        className="border border-slate-200 rounded-lg px-2 py-1 text-xs"                        value={filters.tag}                        onChange={handleFilterChange("tag")}                      >                        <option value="all">Tag (tất cả)</option>                        {tagOptions.map((t) => (                          <option key={t} value={t}>                            {t}                          </option>                        ))}                      </select>                      <select                        className="border border-slate-200 rounded-lg px-2 py-1 text-xs"                        value={filters.difficulty}                        onChange={handleFilterChange("difficulty")}                      >                        <option value="all">Độ khó (tất cả)</option>                        <option value="easy">Dễ</option>                        <option value="medium">Trung bình</option>                        <option value="hard">Khó</option>                      </select>                      <div className="flex-1 min-w-[180px]">                        <input                          className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs"                          placeholder="Tìm theo nội dung..."                          value={filters.search}                          onChange={handleFilterChange("search")}                        />                      </div>                      <button                        type="button"                        onClick={fetchQuestionBank}                        className="px-2 py-1 text-xs border border-slate-200 rounded-lg hover:bg-slate-100"                      >                        ↻                      </button>                    </div>                    <div className="mt-2 border border-slate-200 rounded-lg bg-white max-h-[360px] overflow-y-auto">                      {loadingQuestions && (                        <p className="text-xs text-slate-500 px-3 py-2">                          Đang tải câu hỏi...                        </p>                      )}                      {!loadingQuestions && filteredQuestions.length === 0 && (                        <p className="text-xs text-slate-500 px-3 py-2">                          Chưa có câu hỏi nào trong ngân hàng cho khoá học                          này.                        </p>                      )}                      {!loadingQuestions &&                        filteredQuestions.map((q) => {                          const checked = selectedQuestionIds.includes(                            String(q._id)                          );                          return (                            <label                              key={q._id}                              className="flex items-start gap-2 px-3 py-2 border-b border-slate-50 text-sm hover:bg-slate-50 cursor-pointer"                            >                              <input                                type="checkbox"                                checked={checked}                                onChange={() =>                                  toggleQuestionSelected(q._id)                                }                                className="mt-1"                              />                              <div className="flex-1">                                <div className="text-slate-800">                                  {q.content}                                </div>                                <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap gap-2">                                  {q.chapter && (                                    <span>📘 Chương: {q.chapter}</span>                                  )}                                  {q.difficulty && (                                    <span>                                      🎯 Độ khó:{" "}                                      {q.difficulty === "easy"                                        ? "Dễ"                                        : q.difficulty === "hard"                                        ? "Khó"                                        : "Trung bình"}                                    </span>                                  )}                                  {q.tags && q.tags.length > 0 && (                                    <span>                                      🔖 Tags: {q.tags.join(", ")}                                    </span>                                  )}                                  <span>⏱ Điểm: {q.score || 1}</span>                                </div>                              </div>                            </label>                          );                        })}                    </div>                    <p className="text-xs text-slate-500 mt-2">                      Bạn đang chọn thủ công{" "}                      <span className="font-semibold text-orange-600">                        {selectedQuestionIds.length}                      </span>{" "}                      câu hỏi cho đề này.                    </p>                  </>                )}              </div>            )}            {}            {questionMode === "auto" && (              <div className="border border-slate-100 rounded-xl bg-slate-50/60 p-4 space-y-4">                <p className="text-sm text-slate-600">                  Hệ thống sẽ dùng cấu hình dưới đây để rút câu hỏi ngẫu nhiên                  từ ngân hàng khi học viên bắt đầu làm bài. Bạn có thể điều                  chỉnh theo chương, tag và độ khó.                </p>                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">                  <div>                    <label className="block text-xs font-medium text-slate-700 mb-1">                      Tổng số câu                    </label>                    <input                      type="number"                      min={1}                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"                      value={autoConfig.totalQuestions}                      onChange={handleAutoConfigChange("totalQuestions")}                    />                  </div>                  <div>                    <label className="block text-xs font-medium text-slate-700 mb-1">                      Phân bố độ khó (số câu)                    </label>                    <div className="flex items-center gap-2">                      <div className="flex items-center gap-1">                        <span className="text-xs text-slate-500">Dễ</span>                        <input                          type="number"                          min={0}                          className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300"                          value={autoConfig.difficultyDistribution.easy}                          onChange={handleAutoConfigChange(                            "difficultyDistribution",                            "easy"                          )}                        />                      </div>                      <div className="flex items-center gap-1">                        <span className="text-xs text-slate-500">TB</span>                        <input                          type="number"                          min={0}                          className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300"                          value={autoConfig.difficultyDistribution.medium}                          onChange={handleAutoConfigChange(                            "difficultyDistribution",                            "medium"                          )}                        />                      </div>                      <div className="flex items-center gap-1">                        <span className="text-xs text-slate-500">Khó</span>                        <input                          type="number"                          min={0}                          className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300"                          value={autoConfig.difficultyDistribution.hard}                          onChange={handleAutoConfigChange(                            "difficultyDistribution",                            "hard"                          )}                        />                      </div>                    </div>                    <p className="text-[11px] text-slate-400 mt-1">                      Nên để tổng (Dễ + TB + Khó) ≤ Tổng số câu. Nếu ít hơn,                      hệ thống sẽ tự bù thêm câu ngẫu nhiên.                    </p>                  </div>                </div>                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">                  <div>                    <label className="block text-xs font-medium text-slate-700 mb-1">                      Chương áp dụng                    </label>                    <select                      multiple                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-orange-300"                      value={autoConfig.chapters}                      onChange={handleAutoConfigChange("chapters")}                    >                      {chapterOptions.length === 0 && (                        <option value="">(Không có dữ liệu chương)</option>                      )}                      {chapterOptions.map((ch) => (                        <option key={ch} value={ch}>                          {ch}                        </option>                      ))}                    </select>                    <p className="text-[11px] text-slate-400 mt-1">                      Bỏ trống = dùng tất cả chương có trong ngân hàng.                    </p>                  </div>                  <div>                    <label className="block text-xs font-medium text-slate-700 mb-1">                      Tags áp dụng                    </label>                    <select                      multiple                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-orange-300"                      value={autoConfig.tags}                      onChange={handleAutoConfigChange("tags")}                    >                      {tagOptions.length === 0 && (                        <option value="">(Không có dữ liệu tag)</option>                      )}                      {tagOptions.map((t) => (                        <option key={t} value={t}>                          {t}                        </option>                      ))}                    </select>                    <p className="text-[11px] text-slate-400 mt-1">                      Bỏ trống = dùng tất cả tags.                    </p>                  </div>                </div>                <p className="text-xs text-slate-500">                  Hệ thống sẽ tự rút{" "}                  <span className="font-semibold">                    {autoConfig.totalQuestions || 0}                  </span>{" "}                  câu theo cấu hình AI ở trên mỗi lần mở đề.                </p>              </div>            )}          </>        )}        {}        <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">          <button            type="button"            onClick={() => navigate("/admin/exams")}            className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50"          >            Hủy          </button>          <button            type="submit"            disabled={saving}            className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 disabled:opacity-60"          >            {saving ? "Đang lưu..." : isEdit ? "Lưu đề thi" : "Tạo đề thi"}          </button>        </div>      </form>    </div>  );}

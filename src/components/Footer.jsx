@@ -1,16 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { FaFacebookF, FaTwitter, FaYoutube } from "react-icons/fa";
-
 export default function Footer() {
   return (
     <footer className="mt-12">
-      {/* viền cam mảnh phía trên như các site lớn */}
+      {}
       <div className="h-1 bg-gradient-to-r from-primary to-accent" />
-
       <div className="bg-slate-900 text-gray-300">
         <div className="container-page py-10 grid md:grid-cols-3 gap-8">
-          {/* Brand */}
+          {}
           <div>
             <div className="inline-flex items-center gap-2 mb-3">
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-primaryLight text-primary font-semibold">
@@ -22,8 +20,7 @@ export default function Footer() {
               Nền tảng học trực tuyến giúp bạn nâng cao kỹ năng mọi lúc, mọi nơi.
             </p>
           </div>
-
-          {/* Quick links */}
+          {}
           <div>
             <h3 className="text-lg font-semibold text-white mb-3">
               Liên kết nhanh
@@ -51,8 +48,7 @@ export default function Footer() {
               </li>
             </ul>
           </div>
-
-          {/* Social */}
+          {}
           <div>
             <h3 className="text-lg font-semibold text-white mb-3">
               Theo dõi chúng tôi
@@ -82,7 +78,6 @@ export default function Footer() {
             </div>
           </div>
         </div>
-
         <div className="border-t border-white/10">
           <div className="container-page py-4 text-center text-sm text-gray-400">
             © {new Date().getFullYear()} <span className="text-white">HKCode</span>.
