@@ -1,690 +1,1 @@
-// ======================= AI CONTROLLER FULL =============================
-const { z } = require("zod");
-const Course = require("../models/Course");
-const Exam = require("../models/Exam");
-const ExamAttempt = require("../models/ExamAttempt");
-const ExamQuestionBank = require("../models/ExamQuestionBank");
-const Skill = require("../models/Skill");
-
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-
-/* ========================================================================
-   CHATBOX TƯ VẤN KHOÁ HỌC
-========================================================================= */
-
-const SYSTEM_PROMPT = `
-Bạn là Chatbox AI của HKCode.
-- Trả lời tiếng Việt.
-- Ngắn gọn, ưu tiên gợi ý hữu ích.
-`;
-
-function escapeHtml(str = "") {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-exports.chat = async (req, res) => {
-  try {
-    const { messages } = req.body;
-
-    const resp = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.5,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-      }),
-    });
-
-    const data = await resp.json();
-    const answer =
-      data?.choices?.[0]?.message?.content ||
-      "Xin lỗi, hiện mình không trả lời được.";
-
-    return res.json({ ok: true, text: answer });
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: err.message });
-  }
-};
-
-/* ========================================================================
-   AI CHẤM TỰ LUẬN
-========================================================================= */
-exports.gradeEssay = async (req, res) => {
-  try {
-    const { question, studentAnswer, maxScore = 10 } = req.body;
-
-    const prompt = `
-Chấm điểm tự luận theo format JSON.
-
-Câu hỏi: ${question}
-Bài làm: ${studentAnswer}
-
-Yêu cầu trả về:
-{
-  "score": số từ 0 đến ${maxScore},
-  "comment": "nhận xét tiếng Việt"
-}
-`;
-
-    const ai = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.2,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await ai.json();
-    const raw = data?.choices?.[0]?.message?.content?.trim() || "{}";
-
-    let parsed = { score: 0, comment: "Không phân tích được" };
-
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {}
-
-    res.json({
-      ok: true,
-      scoreSuggestion: parsed.score,
-      commentSuggestion: parsed.comment,
-    });
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: err.message });
-  }
-};
-
-/* ========================================================================
-   🎯 AI GIẢI THÍCH VÌ SAO ĐÚNG / SAI CHO TỪNG CÂU
-   (dùng cho nút "Giải thích bằng AI" ở trang kết quả)
-========================================================================= */
-exports.explainAnswer = async (req, res) => {
-  try {
-    if (!OPENAI_KEY) {
-      return res
-        .status(500)
-        .json({ ok: false, error: "Thiếu OPENAI_API_KEY trên server." });
-    }
-
-    const {
-      questionId,
-      questionContent = "",
-      type = "",
-      options = [],
-      studentAnswer = {},
-      score = 0,
-      maxScore = 0,
-    } = req.body || {};
-
-    const selectedOptionIds = (studentAnswer.selectedOptionIds || []).map(
-      String
-    );
-    const answerText = studentAnswer.answerText || "";
-
-    // Chuẩn hóa danh sách lựa chọn
-    const optionLines = options.map((op, idx) => {
-      const label = String.fromCharCode(65 + idx); // A, B, C...
-      const tag = op.isCorrect ? " (đáp án đúng)" : "";
-      return `${label}. ${op.text}${tag}`;
-    });
-
-    const correctOptions = options.filter((op) => op.isCorrect);
-    const correctAnswerText =
-      correctOptions.length > 0
-        ? correctOptions.map((op) => op.text).join("; ")
-        : "";
-
-    const studentSelectedTexts = options
-      .filter((op) => selectedOptionIds.includes(String(op.id)))
-      .map((op) => op.text);
-
-    let studentAnswerText = "";
-
-    if (type === "multiple_choice" || type === "true_false") {
-      if (studentSelectedTexts.length > 0) {
-        studentAnswerText = studentSelectedTexts.join("; ");
-      } else if (answerText) {
-        studentAnswerText = answerText;
-      } else {
-        studentAnswerText = "(Không trả lời)";
-      }
-    } else {
-      studentAnswerText = answerText || "(Không trả lời)";
-    }
-
-    const humanType =
-      type === "multiple_choice"
-        ? "Trắc nghiệm"
-        : type === "true_false"
-        ? "Đúng/Sai"
-        : type === "short_answer"
-        ? "Tự luận ngắn"
-        : type === "essay"
-        ? "Bài luận"
-        : "Khác";
-
-    const prompt = `
-Bạn là trợ lý giải thích đáp án bài kiểm tra cho học viên người Việt, có thể là các môn: tiếng Anh, toán, lập trình, logic...
-
-Thông tin câu hỏi:
-- Loại câu hỏi: ${humanType}
-- Nội dung câu hỏi: ${questionContent}
-
-Các lựa chọn (nếu có):
-${optionLines.join("\n")}
-
-Đáp án đúng theo hệ thống: ${
-      correctAnswerText || "(có thể là câu tự luận, không có lựa chọn rõ ràng)"
-    }
-Câu trả lời của học viên: ${studentAnswerText}
-Điểm hệ thống chấm: ${score}/${maxScore}
-
-YÊU CẦU:
-- Giải thích NGẮN GỌN, dễ hiểu, bằng tiếng Việt.
-- Tập trung đúng vào kiến thức của môn đó (nếu là toán: giải thích từng bước; lập trình: giải thích logic/code; tiếng Anh: ngữ pháp/từ vựng; ...).
-- Giải thích vì sao câu trả lời của học viên đúng hoặc sai.
-- Giải thích vì sao đáp án đúng là hợp lý nhất.
-- Đưa ra 1 mẹo nhỏ giúp học viên làm tốt hơn ở lần sau.
-- Không nhắc tới "AI", "mô hình ngôn ngữ", "tôi chỉ là...".
-
-Hãy TRẢ VỀ đúng chuẩn JSON, không thêm chữ nào ngoài JSON:
-
-{
-  "verdict": "Đúng" hoặc "Sai" hoặc "Chưa trả lời",
-  "explanation": "Giải thích ngắn gọn vì sao câu trả lời của học viên đúng hoặc sai.",
-  "correctAnswerText": "Nội dung (hoặc danh sách) đáp án đúng.",
-  "reasonCorrect": "Giải thích vì sao đáp án đúng là hợp lý nhất.",
-  "tip": "Một mẹo ngắn giúp học viên làm tốt hơn với dạng câu hỏi tương tự."
-}
-`;
-
-    const ai = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.3,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await ai.json();
-    const raw = data?.choices?.[0]?.message?.content?.trim() || "{}";
-
-    let parsed = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      console.error("❌ Lỗi parse JSON explainAnswer:", e);
-      parsed = {
-        verdict: "Không rõ",
-        explanation: raw,
-        correctAnswerText,
-        reasonCorrect: "",
-        tip: "",
-      };
-    }
-
-    return res.json({
-      ok: true,
-      verdict: parsed.verdict || "Không rõ",
-      explanation: parsed.explanation || "",
-      correctAnswerText:
-        parsed.correctAnswerText || correctAnswerText || "",
-      reasonCorrect: parsed.reasonCorrect || "",
-      tip: parsed.tip || "",
-    });
-  } catch (err) {
-    console.error(err);
-    return res.json({
-      ok: false,
-      error: err.message,
-    });
-  }
-};
-
-/* ========================================================================
-   🎓 AI GIA SƯ TRONG BÀI HỌC (Lesson Tutor)
-   Học viên hỏi về nội dung bài, AI giải thích lại cho dễ hiểu
-========================================================================= */
-exports.lessonTutor = async (req, res) => {
-  try {
-    if (!OPENAI_KEY) {
-      return res
-        .status(500)
-        .json({ ok: false, error: "Thiếu OPENAI_API_KEY trên server." });
-    }
-
-    const {
-      lessonTitle = "",
-      lessonContent = "",
-      userQuestion = "",
-      courseTitle = "",
-      language = "vi", // "vi" hoặc "en"
-    } = req.body || {};
-
-    if (!userQuestion.trim()) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Thiếu câu hỏi của học viên (userQuestion)." });
-    }
-
-    const langInstruction =
-      language === "en"
-        ? "Answer in clear, simple English. Use short sentences and examples."
-        : "Trả lời bằng tiếng Việt, rõ ràng, dễ hiểu, dùng ví dụ đơn giản.";
-
-    const prompt = `
-Bạn là gia sư riêng của học viên, giải thích kiến thức trong bài học (có thể là các môn: tiếng Anh, toán, lập trình, tư duy, logic...).
-
-Thông tin khoá học (nếu có):
-- Khoá học: ${courseTitle || "(không rõ)"}
-
-Bài học hiện tại:
-- Tiêu đề: ${lessonTitle || "(không rõ tiêu đề)"}
-
-Tóm tắt / nội dung bài học (nếu có):
-${lessonContent || "(không có tóm tắt, hãy dùng kiến thức nền phù hợp với tiêu đề bài / câu hỏi)"}
-
-Câu hỏi của học viên:
-"${userQuestion}"
-
-YÊU CẦU:
-- ${langInstruction}
-- Ưu tiên giải thích dựa trên nội dung, mục tiêu của bài học này.
-- Chia nhỏ ý, có thể dùng bullet để học viên dễ đọc.
-- Nếu học viên hiểu sai, hãy chỉ ra chỗ sai và sửa lại.
-- Có thể cho 1–2 ví dụ minh hoạ liên quan.
-- Không nói rằng bạn là AI hay mô hình ngôn ngữ, chỉ trả lời như một gia sư người thật.
-`;
-
-    const ai = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.4,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await ai.json();
-    const answer =
-      data?.choices?.[0]?.message?.content?.trim() ||
-      "Xin lỗi, hiện mình chưa giải thích được câu hỏi này.";
-
-    return res.json({
-      ok: true,
-      answer,
-    });
-  } catch (err) {
-    console.error("❌ Lỗi lessonTutor:", err);
-    return res.json({
-      ok: false,
-      error: err.message,
-    });
-  }
-};
-
-/* ========================================================================
-   🎯 AI SINH CÂU HỎI ĐA MÔN (Toán, Lập trình, Tiếng Anh, ...)
-========================================================================= */
-exports.generateQuestionsByAI = async (req, res) => {
-  try {
-    if (!OPENAI_KEY) {
-      return res
-        .status(500)
-        .json({ ok: false, error: "Thiếu OPENAI_API_KEY trên server." });
-    }
-
-    const {
-      subject = "general", // "math" | "programming" | "english" | ...
-      topic = "",
-      level = "medium", // "easy" | "medium" | "hard"
-      numQuestions = 5,
-      questionType = "multiple_choice", // "multiple_choice" | "true_false" | "short_answer"
-      language = "vi", // "vi" hoặc "en"
-    } = req.body || {};
-
-    const prompt = `
-Bạn là trợ lý tạo câu hỏi kiểm tra cho hệ thống LMS đa môn.
-
-THÔNG TIN ĐẦU VÀO:
-- Môn học (subject): ${subject}
-- Chủ đề/chương (topic): ${topic || "không ghi rõ"}
-- Độ khó (level): ${level} (easy/medium/hard)
-- Số câu hỏi: ${numQuestions}
-- Dạng câu hỏi (questionType): ${questionType}
-  - "multiple_choice": trắc nghiệm 1 đáp án đúng
-  - "true_false": Đúng/Sai
-  - "short_answer": trả lời ngắn (1-2 câu)
-- Ngôn ngữ câu hỏi (language): ${language}
-
-YÊU CẦU:
-1. Tạo đúng ${numQuestions} câu hỏi phù hợp với môn học và chủ đề.
-2. Mỗi câu hỏi trả về theo cấu trúc JSON:
-{
-  "type": "multiple_choice" | "true_false" | "short_answer",
-  "content": "Nội dung câu hỏi",
-  "options": [
-    { "text": "phương án A", "isCorrect": true/false },
-    ...
-  ],
-  "correctAnswerText": "nếu là short_answer thì ghi đáp án đúng ở đây (text)",
-  "explanation": "giải thích ngắn gọn vì sao đáp án đúng"
-}
-
-- Với "multiple_choice":
-  - tối thiểu 3, tối đa 5 phương án.
-  - chính xác 1 phương án có "isCorrect": true.
-- Với "true_false":
-  - tạo 2 phương án, ví dụ "Đúng" và "Sai" / "True" và "False".
-- Với "short_answer":
-  - "options" có thể là [], dùng "correctAnswerText" để ghi đáp án mẫu.
-
-3. Ngôn ngữ:
-- Nếu language = "vi" → câu hỏi, phương án, giải thích bằng tiếng Việt.
-- Nếu language = "en" → bằng tiếng Anh.
-
-TRẢ VỀ DUY NHẤT JSON với format:
-{
-  "questions": [
-    {
-      "type": "...",
-      "content": "...",
-      "options": [...],
-      "correctAnswerText": "...",
-      "explanation": "..."
-    }
-  ]
-}
-Không thêm text ngoài JSON.
-`;
-
-    const ai = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.4,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await ai.json();
-    const raw = data?.choices?.[0]?.message?.content?.trim() || "{}";
-
-    let parsed = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      console.error("❌ Lỗi parse JSON generateQuestionsByAI:", e);
-    }
-
-    const questions = Array.isArray(parsed.questions) ? parsed.questions : [];
-
-    return res.json({
-      ok: true,
-      questions,
-    });
-  } catch (err) {
-    console.error(err);
-    return res.json({ ok: false, error: err.message });
-  }
-};
-
-/* ========================================================================
-   🎯 1) TẠO SKILL MAP TỪ BÀI TEST ĐẦU VÀO
-========================================================================= */
-exports.generateSkillMapFromEntryTest = async (req, res) => {
-  try {
-    const { examId, attemptId, courseId, userId } = req.body;
-
-    const attempt = await ExamAttempt.findById(attemptId)
-      .populate("answers.question")
-      .lean();
-
-    if (!attempt) {
-      return res
-        .status(404)
-        .json({ ok: false, message: "Không tìm thấy attempt" });
-    }
-
-    // Gom điểm theo Skill
-    const skillScore = {}; // { skillId: { got, max } }
-
-    for (const ans of attempt.answers) {
-      const q = ans.question;
-      if (!q.skill) continue;
-
-      const sid = String(q.skill);
-      if (!skillScore[sid]) skillScore[sid] = { got: 0, max: 0 };
-
-      skillScore[sid].got += ans.score || 0;
-      skillScore[sid].max += q.score || 0;
-    }
-
-    // Lấy thông tin skill
-    const skillDocs = await Skill.find({ _id: { $in: Object.keys(skillScore) } });
-
-    /* === Chuẩn bị dữ liệu gửi cho AI === */
-    const aiPayload = skillDocs.map((sk) => {
-      const sc = skillScore[String(sk._id)];
-      const pct = sc.max > 0 ? Math.round((sc.got / sc.max) * 100) : 0;
-
-      return {
-        skill: sk.name,
-        description: sk.description,
-        percent: pct,
-      };
-    });
-
-    const prompt = `
-Bạn là AI phân tích năng lực học viên dựa trên điểm theo kỹ năng.
-
-Dữ liệu đầu vào:
-${JSON.stringify(aiPayload, null, 2)}
-
-Hãy trả về JSON:
-{
-  "skillLevels": { "React cơ bản": "beginner" | "intermediate" | "advanced" },
-  "suggestedSkills": ["kỹ năng 1", "kỹ năng 2"],
-  "recommendedPath": ["kỹ năng nên học trước", "kỹ năng học sau"]
-}
-`;
-
-    const ai = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.3,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await ai.json();
-    const raw = data?.choices?.[0]?.message?.content || "{}";
-
-    let parsed = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch {}
-
-    return res.json({
-      ok: true,
-      input: aiPayload,
-      ai: parsed,
-    });
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: err.message });
-  }
-};
-
-/* ========================================================================
-   🎯 2) PHÂN TÍCH BÀI THI GIỮA / CUỐI KHOÁ → GỢI Ý HỌC LẠI
-========================================================================= */
-exports.analyzeLearningPathAfterExam = async (req, res) => {
-  try {
-    const { examId, attemptId } = req.body;
-
-    const attempt = await ExamAttempt.findById(attemptId)
-      .populate("answers.question")
-      .lean();
-
-    if (!attempt) {
-      return res
-        .status(404)
-        .json({ ok: false, message: "Không tìm thấy attempt" });
-    }
-
-    // Tổng điểm theo skill
-    const skillScore = {};
-
-    attempt.answers.forEach((ans) => {
-      const q = ans.question;
-      if (!q.skill) return;
-
-      const sid = String(q.skill);
-      if (!skillScore[sid]) skillScore[sid] = { got: 0, max: 0 };
-
-      skillScore[sid].got += ans.score;
-      skillScore[sid].max += q.score;
-    });
-
-    const skillDocs = await Skill.find({
-      _id: { $in: Object.keys(skillScore) },
-    });
-
-    const info = skillDocs.map((sk) => {
-      const sc = skillScore[String(sk._id)];
-      const pct = sc.max ? Math.round((sc.got / sc.max) * 100) : 0;
-      return { skill: sk.name, percent: pct };
-    });
-
-    const prompt = `
-Bạn là AI cố vấn học tập.
-Dưới đây là điểm theo kỹ năng sau bài kiểm tra:
-
-${JSON.stringify(info, null, 2)}
-
-Hãy trả về JSON:
-{
-  "weakSkills": ["kỹ năng yếu"],
-  "shouldReview": ["những skill cần ôn lại"],
-  "recommendations": ["gợi ý học tập chi tiết bằng tiếng Việt"]
-}
-`;
-
-    const ai = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.3,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await ai.json();
-    const raw = data?.choices?.[0]?.message?.content || "{}";
-
-    let parsed = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch {}
-
-    return res.json({ ok: true, ai: parsed, raw });
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: err.message });
-  }
-};
-
-/* ========================================================================
-   🎯 3) GỢI Ý KỸ NĂNG TIẾP THEO
-========================================================================= */
-exports.suggestNextSkills = async (req, res) => {
-  try {
-    const { courseId, learnedSkills = [] } = req.body;
-
-    const allSkills = await Skill.find({ course: courseId }).lean();
-
-    const prompt = `
-Bạn là AI tư vấn lộ trình học.
-
-Danh sách kỹ năng đã học:
-${JSON.stringify(learnedSkills)}
-
-Danh sách kỹ năng toàn khóa:
-${JSON.stringify(allSkills.map((s) => s.name))}
-
-Hãy trả về JSON:
-{
-  "nextSkills": ["kỹ năng 1", "kỹ năng 2"],
-  "reason": "giải thích ngắn gọn"
-}
-`;
-
-    const ai = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.4,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await ai.json();
-    const raw = data?.choices?.[0]?.message?.content || "{}";
-
-    let parsed = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch {}
-
-    return res.json({ ok: true, ai: parsed });
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: err.message });
-  }
-};
-
-// ======================= END FILE ===============================
+const { z } = require("zod");const Course = require("../models/Course");const Exam = require("../models/Exam");const ExamAttempt = require("../models/ExamAttempt");const ExamQuestionBank = require("../models/ExamQuestionBank");const Skill = require("../models/Skill");const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";const OPENAI_URL = "https://api.openai.com/v1/chat/completions";const OPENAI_KEY = process.env.OPENAI_API_KEY;const SYSTEM_PROMPT = `Bạn là Chatbox AI của HKCode.- Trả lời tiếng Việt.- Ngắn gọn, ưu tiên gợi ý hữu ích.`;function escapeHtml(str = "") {  return str    .replace(/&/g, "&amp;")    .replace(/</g, "&lt;")    .replace(/>/g, "&gt;")    .replace(/"/g, "&quot;")    .replace(/'/g, "&#039;");}exports.chat = async (req, res) => {  try {    const { messages } = req.body;    const resp = await fetch(OPENAI_URL, {      method: "POST",      headers: {        "Content-Type": "application/json",        Authorization: `Bearer ${OPENAI_KEY}`,      },      body: JSON.stringify({        model: MODEL,        temperature: 0.5,        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],      }),    });    const data = await resp.json();    const answer =      data?.choices?.[0]?.message?.content ||      "Xin lỗi, hiện mình không trả lời được.";    return res.json({ ok: true, text: answer });  } catch (err) {    console.error(err);    res.json({ ok: false, error: err.message });  }};exports.gradeEssay = async (req, res) => {  try {    const { question, studentAnswer, maxScore = 10 } = req.body;    const prompt = `Chấm điểm tự luận theo format JSON.Câu hỏi: ${question}Bài làm: ${studentAnswer}Yêu cầu trả về:{  "score": số từ 0 đến ${maxScore},  "comment": "nhận xét tiếng Việt"}`;    const ai = await fetch(OPENAI_URL, {      method: "POST",      headers: {        "Content-Type": "application/json",        Authorization: `Bearer ${OPENAI_KEY}`,      },      body: JSON.stringify({        model: MODEL,        temperature: 0.2,        messages: [{ role: "user", content: prompt }],      }),    });    const data = await ai.json();    const raw = data?.choices?.[0]?.message?.content?.trim() || "{}";    let parsed = { score: 0, comment: "Không phân tích được" };    try {      parsed = JSON.parse(raw);    } catch (e) {}    res.json({      ok: true,      scoreSuggestion: parsed.score,      commentSuggestion: parsed.comment,    });  } catch (err) {    console.error(err);    res.json({ ok: false, error: err.message });  }};exports.explainAnswer = async (req, res) => {  try {    if (!OPENAI_KEY) {      return res        .status(500)        .json({ ok: false, error: "Thiếu OPENAI_API_KEY trên server." });    }    const {      questionId,      questionContent = "",      type = "",      options = [],      studentAnswer = {},      score = 0,      maxScore = 0,    } = req.body || {};    const selectedOptionIds = (studentAnswer.selectedOptionIds || []).map(      String    );    const answerText = studentAnswer.answerText || "";    const optionLines = options.map((op, idx) => {      const label = String.fromCharCode(65 + idx);       const tag = op.isCorrect ? " (đáp án đúng)" : "";      return `${label}. ${op.text}${tag}`;    });    const correctOptions = options.filter((op) => op.isCorrect);    const correctAnswerText =      correctOptions.length > 0        ? correctOptions.map((op) => op.text).join("; ")        : "";    const studentSelectedTexts = options      .filter((op) => selectedOptionIds.includes(String(op.id)))      .map((op) => op.text);    let studentAnswerText = "";    if (type === "multiple_choice" || type === "true_false") {      if (studentSelectedTexts.length > 0) {        studentAnswerText = studentSelectedTexts.join("; ");      } else if (answerText) {        studentAnswerText = answerText;      } else {        studentAnswerText = "(Không trả lời)";      }    } else {      studentAnswerText = answerText || "(Không trả lời)";    }    const humanType =      type === "multiple_choice"        ? "Trắc nghiệm"        : type === "true_false"        ? "Đúng/Sai"        : type === "short_answer"        ? "Tự luận ngắn"        : type === "essay"        ? "Bài luận"        : "Khác";    const prompt = `Bạn là trợ lý giải thích đáp án bài kiểm tra cho học viên người Việt, có thể là các môn: tiếng Anh, toán, lập trình, logic...Thông tin câu hỏi:- Loại câu hỏi: ${humanType}- Nội dung câu hỏi: ${questionContent}Các lựa chọn (nếu có):${optionLines.join("\n")}Đáp án đúng theo hệ thống: ${      correctAnswerText || "(có thể là câu tự luận, không có lựa chọn rõ ràng)"    }Câu trả lời của học viên: ${studentAnswerText}Điểm hệ thống chấm: ${score}/${maxScore}YÊU CẦU:- Giải thích NGẮN GỌN, dễ hiểu, bằng tiếng Việt.- Tập trung đúng vào kiến thức của môn đó (nếu là toán: giải thích từng bước; lập trình: giải thích logic/code; tiếng Anh: ngữ pháp/từ vựng; ...).- Giải thích vì sao câu trả lời của học viên đúng hoặc sai.- Giải thích vì sao đáp án đúng là hợp lý nhất.- Đưa ra 1 mẹo nhỏ giúp học viên làm tốt hơn ở lần sau.- Không nhắc tới "AI", "mô hình ngôn ngữ", "tôi chỉ là...".Hãy TRẢ VỀ đúng chuẩn JSON, không thêm chữ nào ngoài JSON:{  "verdict": "Đúng" hoặc "Sai" hoặc "Chưa trả lời",  "explanation": "Giải thích ngắn gọn vì sao câu trả lời của học viên đúng hoặc sai.",  "correctAnswerText": "Nội dung (hoặc danh sách) đáp án đúng.",  "reasonCorrect": "Giải thích vì sao đáp án đúng là hợp lý nhất.",  "tip": "Một mẹo ngắn giúp học viên làm tốt hơn với dạng câu hỏi tương tự."}`;    const ai = await fetch(OPENAI_URL, {      method: "POST",      headers: {        "Content-Type": "application/json",        Authorization: `Bearer ${OPENAI_KEY}`,      },      body: JSON.stringify({        model: MODEL,        temperature: 0.3,        messages: [{ role: "user", content: prompt }],      }),    });    const data = await ai.json();    const raw = data?.choices?.[0]?.message?.content?.trim() || "{}";    let parsed = {};    try {      parsed = JSON.parse(raw);    } catch (e) {      console.error("❌ Lỗi parse JSON explainAnswer:", e);      parsed = {        verdict: "Không rõ",        explanation: raw,        correctAnswerText,        reasonCorrect: "",        tip: "",      };    }    return res.json({      ok: true,      verdict: parsed.verdict || "Không rõ",      explanation: parsed.explanation || "",      correctAnswerText:        parsed.correctAnswerText || correctAnswerText || "",      reasonCorrect: parsed.reasonCorrect || "",      tip: parsed.tip || "",    });  } catch (err) {    console.error(err);    return res.json({      ok: false,      error: err.message,    });  }};exports.lessonTutor = async (req, res) => {  try {    if (!OPENAI_KEY) {      return res        .status(500)        .json({ ok: false, error: "Thiếu OPENAI_API_KEY trên server." });    }    const {      lessonTitle = "",      lessonContent = "",      userQuestion = "",      courseTitle = "",      language = "vi",     } = req.body || {};    if (!userQuestion.trim()) {      return res        .status(400)        .json({ ok: false, error: "Thiếu câu hỏi của học viên (userQuestion)." });    }    const langInstruction =      language === "en"        ? "Answer in clear, simple English. Use short sentences and examples."        : "Trả lời bằng tiếng Việt, rõ ràng, dễ hiểu, dùng ví dụ đơn giản.";    const prompt = `Bạn là gia sư riêng của học viên, giải thích kiến thức trong bài học (có thể là các môn: tiếng Anh, toán, lập trình, tư duy, logic...).Thông tin khoá học (nếu có):- Khoá học: ${courseTitle || "(không rõ)"}Bài học hiện tại:- Tiêu đề: ${lessonTitle || "(không rõ tiêu đề)"}Tóm tắt / nội dung bài học (nếu có):${lessonContent || "(không có tóm tắt, hãy dùng kiến thức nền phù hợp với tiêu đề bài / câu hỏi)"}Câu hỏi của học viên:"${userQuestion}"YÊU CẦU:- ${langInstruction}- Ưu tiên giải thích dựa trên nội dung, mục tiêu của bài học này.- Chia nhỏ ý, có thể dùng bullet để học viên dễ đọc.- Nếu học viên hiểu sai, hãy chỉ ra chỗ sai và sửa lại.- Có thể cho 1–2 ví dụ minh hoạ liên quan.- Không nói rằng bạn là AI hay mô hình ngôn ngữ, chỉ trả lời như một gia sư người thật.`;    const ai = await fetch(OPENAI_URL, {      method: "POST",      headers: {        "Content-Type": "application/json",        Authorization: `Bearer ${OPENAI_KEY}`,      },      body: JSON.stringify({        model: MODEL,        temperature: 0.4,        messages: [{ role: "user", content: prompt }],      }),    });    const data = await ai.json();    const answer =      data?.choices?.[0]?.message?.content?.trim() ||      "Xin lỗi, hiện mình chưa giải thích được câu hỏi này.";    return res.json({      ok: true,      answer,    });  } catch (err) {    console.error("❌ Lỗi lessonTutor:", err);    return res.json({      ok: false,      error: err.message,    });  }};exports.generateQuestionsByAI = async (req, res) => {  try {    if (!OPENAI_KEY) {      return res        .status(500)        .json({ ok: false, error: "Thiếu OPENAI_API_KEY trên server." });    }    const {      subject = "general",       topic = "",      level = "medium",       numQuestions = 5,      questionType = "multiple_choice",       language = "vi",     } = req.body || {};    const prompt = `Bạn là trợ lý tạo câu hỏi kiểm tra cho hệ thống LMS đa môn.THÔNG TIN ĐẦU VÀO:- Môn học (subject): ${subject}- Chủ đề/chương (topic): ${topic || "không ghi rõ"}- Độ khó (level): ${level} (easy/medium/hard)- Số câu hỏi: ${numQuestions}- Dạng câu hỏi (questionType): ${questionType}  - "multiple_choice": trắc nghiệm 1 đáp án đúng  - "true_false": Đúng/Sai  - "short_answer": trả lời ngắn (1-2 câu)- Ngôn ngữ câu hỏi (language): ${language}YÊU CẦU:1. Tạo đúng ${numQuestions} câu hỏi phù hợp với môn học và chủ đề.2. Mỗi câu hỏi trả về theo cấu trúc JSON:{  "type": "multiple_choice" | "true_false" | "short_answer",  "content": "Nội dung câu hỏi",  "options": [    { "text": "phương án A", "isCorrect": true/false },    ...  ],  "correctAnswerText": "nếu là short_answer thì ghi đáp án đúng ở đây (text)",  "explanation": "giải thích ngắn gọn vì sao đáp án đúng"}- Với "multiple_choice":  - tối thiểu 3, tối đa 5 phương án.  - chính xác 1 phương án có "isCorrect": true.- Với "true_false":  - tạo 2 phương án, ví dụ "Đúng" và "Sai" / "True" và "False".- Với "short_answer":  - "options" có thể là [], dùng "correctAnswerText" để ghi đáp án mẫu.3. Ngôn ngữ:- Nếu language = "vi" → câu hỏi, phương án, giải thích bằng tiếng Việt.- Nếu language = "en" → bằng tiếng Anh.TRẢ VỀ DUY NHẤT JSON với format:{  "questions": [    {      "type": "...",      "content": "...",      "options": [...],      "correctAnswerText": "...",      "explanation": "..."    }  ]}Không thêm text ngoài JSON.`;    const ai = await fetch(OPENAI_URL, {      method: "POST",      headers: {        "Content-Type": "application/json",        Authorization: `Bearer ${OPENAI_KEY}`,      },      body: JSON.stringify({        model: MODEL,        temperature: 0.4,        messages: [{ role: "user", content: prompt }],      }),    });    const data = await ai.json();    const raw = data?.choices?.[0]?.message?.content?.trim() || "{}";    let parsed = {};    try {      parsed = JSON.parse(raw);    } catch (e) {      console.error("❌ Lỗi parse JSON generateQuestionsByAI:", e);    }    const questions = Array.isArray(parsed.questions) ? parsed.questions : [];    return res.json({      ok: true,      questions,    });  } catch (err) {    console.error(err);    return res.json({ ok: false, error: err.message });  }};exports.generateSkillMapFromEntryTest = async (req, res) => {  try {    const { examId, attemptId, courseId, userId } = req.body;    const attempt = await ExamAttempt.findById(attemptId)      .populate("answers.question")      .lean();    if (!attempt) {      return res        .status(404)        .json({ ok: false, message: "Không tìm thấy attempt" });    }    const skillScore = {};     for (const ans of attempt.answers) {      const q = ans.question;      if (!q.skill) continue;      const sid = String(q.skill);      if (!skillScore[sid]) skillScore[sid] = { got: 0, max: 0 };      skillScore[sid].got += ans.score || 0;      skillScore[sid].max += q.score || 0;    }    const skillDocs = await Skill.find({ _id: { $in: Object.keys(skillScore) } });    const aiPayload = skillDocs.map((sk) => {      const sc = skillScore[String(sk._id)];      const pct = sc.max > 0 ? Math.round((sc.got / sc.max) * 100) : 0;      return {        skill: sk.name,        description: sk.description,        percent: pct,      };    });    const prompt = `Bạn là AI phân tích năng lực học viên dựa trên điểm theo kỹ năng.Dữ liệu đầu vào:${JSON.stringify(aiPayload, null, 2)}Hãy trả về JSON:{  "skillLevels": { "React cơ bản": "beginner" | "intermediate" | "advanced" },  "suggestedSkills": ["kỹ năng 1", "kỹ năng 2"],  "recommendedPath": ["kỹ năng nên học trước", "kỹ năng học sau"]}`;    const ai = await fetch(OPENAI_URL, {      method: "POST",      headers: {        "Content-Type": "application/json",        Authorization: `Bearer ${OPENAI_KEY}`,      },      body: JSON.stringify({        model: MODEL,        temperature: 0.3,        messages: [{ role: "user", content: prompt }],      }),    });    const data = await ai.json();    const raw = data?.choices?.[0]?.message?.content || "{}";    let parsed = {};    try {      parsed = JSON.parse(raw);    } catch {}    return res.json({      ok: true,      input: aiPayload,      ai: parsed,    });  } catch (err) {    console.error(err);    res.json({ ok: false, error: err.message });  }};exports.analyzeLearningPathAfterExam = async (req, res) => {  try {    const { examId, attemptId } = req.body;    const attempt = await ExamAttempt.findById(attemptId)      .populate("answers.question")      .lean();    if (!attempt) {      return res        .status(404)        .json({ ok: false, message: "Không tìm thấy attempt" });    }    const skillScore = {};    attempt.answers.forEach((ans) => {      const q = ans.question;      if (!q.skill) return;      const sid = String(q.skill);      if (!skillScore[sid]) skillScore[sid] = { got: 0, max: 0 };      skillScore[sid].got += ans.score;      skillScore[sid].max += q.score;    });    const skillDocs = await Skill.find({      _id: { $in: Object.keys(skillScore) },    });    const info = skillDocs.map((sk) => {      const sc = skillScore[String(sk._id)];      const pct = sc.max ? Math.round((sc.got / sc.max) * 100) : 0;      return { skill: sk.name, percent: pct };    });    const prompt = `Bạn là AI cố vấn học tập.Dưới đây là điểm theo kỹ năng sau bài kiểm tra:${JSON.stringify(info, null, 2)}Hãy trả về JSON:{  "weakSkills": ["kỹ năng yếu"],  "shouldReview": ["những skill cần ôn lại"],  "recommendations": ["gợi ý học tập chi tiết bằng tiếng Việt"]}`;    const ai = await fetch(OPENAI_URL, {      method: "POST",      headers: {        "Content-Type": "application/json",        Authorization: `Bearer ${OPENAI_KEY}`,      },      body: JSON.stringify({        model: MODEL,        temperature: 0.3,        messages: [{ role: "user", content: prompt }],      }),    });    const data = await ai.json();    const raw = data?.choices?.[0]?.message?.content || "{}";    let parsed = {};    try {      parsed = JSON.parse(raw);    } catch {}    return res.json({ ok: true, ai: parsed, raw });  } catch (err) {    console.error(err);    res.json({ ok: false, error: err.message });  }};exports.suggestNextSkills = async (req, res) => {  try {    const { courseId, learnedSkills = [] } = req.body;    const allSkills = await Skill.find({ course: courseId }).lean();    const prompt = `Bạn là AI tư vấn lộ trình học.Danh sách kỹ năng đã học:${JSON.stringify(learnedSkills)}Danh sách kỹ năng toàn khóa:${JSON.stringify(allSkills.map((s) => s.name))}Hãy trả về JSON:{  "nextSkills": ["kỹ năng 1", "kỹ năng 2"],  "reason": "giải thích ngắn gọn"}`;    const ai = await fetch(OPENAI_URL, {      method: "POST",      headers: {        "Content-Type": "application/json",        Authorization: `Bearer ${OPENAI_KEY}`,      },      body: JSON.stringify({        model: MODEL,        temperature: 0.4,        messages: [{ role: "user", content: prompt }],      }),    });    const data = await ai.json();    const raw = data?.choices?.[0]?.message?.content || "{}";    let parsed = {};    try {      parsed = JSON.parse(raw);    } catch {}    return res.json({ ok: true, ai: parsed });  } catch (err) {    console.error(err);    res.json({ ok: false, error: err.message });  }};

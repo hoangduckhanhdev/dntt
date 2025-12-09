@@ -1,399 +1,1 @@
-const Skill = require("../models/Skill");
-const Course = require("../models/Course");
-const Exam = require("../models/Exam");
-const ExamAttempt = require("../models/ExamAttempt");
-const UserSkillProfile = require("../models/UserSkillProfile");
-
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-
-// helper gọi OpenAI
-async function callOpenAI(messages, temperature = 0.3) {
-  const resp = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      temperature,
-      messages,
-    }),
-  });
-
-  const data = await resp.json();
-  const text = data?.choices?.[0]?.message?.content?.trim() || "";
-  return text;
-}
-
-// parse JSON an toàn
-function safeParseJSON(text, fallback) {
-  try {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-    if (start === -1 || end === -1) return fallback;
-    const jsonStr = text.substring(start, end + 1);
-    return JSON.parse(jsonStr);
-  } catch (e) {
-    console.error("safeParseJSON error:", e, "RAW:", text);
-    return fallback;
-  }
-}
-
-/* ==========================================================
-   1) ENTRY TEST → SKILL MAP
-   POST /api/ai/skill-map-from-entry-test
-   body: { courseId, userId, examId, attemptId }
-========================================================== */
-exports.generateSkillMapFromEntryTest = async (req, res) => {
-  try {
-    const { courseId, userId, examId, attemptId } = req.body || {};
-
-    if (!courseId || !userId || !examId || !attemptId) {
-      return res.status(400).json({
-        ok: false,
-        message: "Thiếu courseId / userId / examId / attemptId",
-      });
-    }
-
-    const [course, exam, attempt, skills] = await Promise.all([
-      Course.findById(courseId),
-      Exam.findById(examId),
-      ExamAttempt.findById(attemptId).populate({
-        path: "answers.question",
-        model: "ExamQuestionBank",
-      }),
-      Skill.find({ course: courseId }).sort({ order: 1 }),
-    ]);
-
-    if (!course || !exam || !attempt) {
-      return res.status(404).json({
-        ok: false,
-        message: "Không tìm thấy course/exam/attempt phù hợp",
-      });
-    }
-
-    const ratio =
-      attempt.maxScore > 0
-        ? attempt.totalScore / attempt.maxScore
-        : 0;
-
-    // build context câu hỏi + kết quả
-    const questionSummaries = attempt.answers.map((ans, idx) => {
-      const q = ans.question || {};
-      const correctRatio =
-        ans.maxScore > 0 ? (ans.score || 0) / ans.maxScore : 0;
-      return {
-        index: idx + 1,
-        content: q.content,
-        type: q.type,
-        difficulty: q.difficulty,
-        score: ans.score || 0,
-        maxScore: ans.maxScore || 0,
-        correctRatio,
-      };
-    });
-
-    // danh sách skill tên + mô tả để AI hiểu
-    const skillContext = skills.map((s) => ({
-      id: String(s._id),
-      name: s.name,
-      description: s.description || "",
-      level: s.level || "intermediate",
-    }));
-
-    const systemPrompt = `
-Bạn là hệ thống tư vấn lộ trình học dựa trên bài test đầu vào cho một khoá học lập trình / kỹ năng.
-
-Nhiệm vụ:
-- Nhìn vào kết quả bài test đầu vào (câu hỏi + điểm) và danh sách kỹ năng của khoá học.
-- Suy luận mức độ hiện tại của học viên với từng kỹ năng: "beginner", "intermediate", "advanced".
-- Đề xuất lộ trình học (recommendedPath): danh sách tên kỹ năng theo thứ tự nên học.
-- Liệt kê các kỹ năng quan trọng nhất nên tập trung trong giai đoạn đầu (suggestedSkills).
-
-TRẢ VỀ DUY NHẤT JSON theo format:
-
-{
-  "skillLevels": {
-    "Tên skill 1": "beginner" | "intermediate" | "advanced",
-    "Tên skill 2": "..."
-  },
-  "recommendedPath": [
-    "Tên skill ưu tiên 1",
-    "Tên skill ưu tiên 2",
-    "..."
-  ],
-  "suggestedSkills": [
-    "Tên skill quan trọng 1",
-    "Tên skill quan trọng 2"
-  ]
-}
-`;
-
-    const userPrompt = `
-THÔNG TIN KHOÁ HỌC: ${course.title}
-
-KỸ NĂNG TRONG KHOÁ:
-${JSON.stringify(skillContext, null, 2)}
-
-KẾT QUẢ ENTRY TEST:
-Điểm tổng: ${attempt.totalScore}/${attempt.maxScore} (ratio: ${ratio.toFixed(
-      2
-    )})
-
-Danh sách câu hỏi & kết quả:
-${JSON.stringify(questionSummaries, null, 2)}
-`;
-
-    const raw = await callOpenAI(
-      [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      0.3
-    );
-
-    const ai = safeParseJSON(raw, {
-      skillLevels: {},
-      recommendedPath: [],
-      suggestedSkills: [],
-    });
-
-    // ========== CẬP NHẬT UserSkillProfile ==========
-    const nameToSkill = {};
-    skills.forEach((s) => {
-      nameToSkill[s.name] = s;
-    });
-
-    const ops = [];
-    const skillLevels = ai.skillLevels || {};
-
-    for (const [skillName, level] of Object.entries(skillLevels)) {
-      const skillDoc = nameToSkill[skillName];
-      if (!skillDoc) continue;
-
-      const lvl =
-        ["beginner", "intermediate", "advanced"].includes(level)
-          ? level
-          : "beginner";
-
-      ops.push(
-        UserSkillProfile.findOneAndUpdate(
-          {
-            user: userId,
-            course: courseId,
-            skill: skillDoc._id,
-          },
-          {
-            level: lvl,
-            source: "entry_test",
-            lastExam: examId,
-            lastAttempt: attemptId,
-            lastScoreRatio: ratio,
-            aiSummary: `AI đánh giá ${skillName} ở mức ${lvl} dựa trên bài test đầu vào.`,
-          },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        )
-      );
-    }
-
-    await Promise.all(ops);
-
-    return res.json({
-      ok: true,
-      input: { courseId, userId, examId, attemptId },
-      ai,
-    });
-  } catch (err) {
-    console.error("generateSkillMapFromEntryTest error:", err);
-    res.status(500).json({
-      ok: false,
-      message: "Lỗi khi sinh Skill Map từ entry test",
-    });
-  }
-};
-
-/* ==========================================================
-   2) PHÂN TÍCH SAU BÀI KIỂM TRA
-   POST /api/ai/learning-path-after-exam
-   body: { courseId, userId, examId, attemptId }
-========================================================== */
-exports.analyzeLearningPathAfterExam = async (req, res) => {
-  try {
-    const { courseId, userId, examId, attemptId } = req.body || {};
-
-    if (!courseId || !userId || !examId || !attemptId) {
-      return res.status(400).json({
-        ok: false,
-        message: "Thiếu courseId / userId / examId / attemptId",
-      });
-    }
-
-    const [course, exam, attempt, skills] = await Promise.all([
-      Course.findById(courseId),
-      Exam.findById(examId),
-      ExamAttempt.findById(attemptId).populate({
-        path: "answers.question",
-        model: "ExamQuestionBank",
-      }),
-      Skill.find({ course: courseId }).sort({ order: 1 }),
-    ]);
-
-    if (!course || !exam || !attempt) {
-      return res.status(404).json({
-        ok: false,
-        message: "Không tìm thấy course/exam/attempt phù hợp",
-      });
-    }
-
-    const ratio =
-      attempt.maxScore > 0
-        ? attempt.totalScore / attempt.maxScore
-        : 0;
-
-    const questionSummaries = attempt.answers.map((ans, idx) => {
-      const q = ans.question || {};
-      const correctRatio =
-        ans.maxScore > 0 ? (ans.score || 0) / ans.maxScore : 0;
-      return {
-        index: idx + 1,
-        content: q.content,
-        type: q.type,
-        difficulty: q.difficulty,
-        score: ans.score || 0,
-        maxScore: ans.maxScore || 0,
-        correctRatio,
-      };
-    });
-
-    const skillContext = skills.map((s) => ({
-      id: String(s._id),
-      name: s.name,
-      description: s.description || "",
-      level: s.level || "intermediate",
-    }));
-
-    const systemPrompt = `
-Bạn là cố vấn học tập.
-
-Nhiệm vụ:
-- Dựa trên kết quả bài kiểm tra giữa kỳ/cuối kỳ và danh sách kỹ năng.
-- Xác định các "weakSkills": kỹ năng còn yếu / điểm thấp.
-- Gợi ý "shouldReview": danh sách bài / chủ đề nên ôn lại (theo tên kỹ năng).
-- Đưa ra "recommendations": những lời khuyên cụ thể (câu văn ngắn tiếng Việt).
-
-TRẢ VỀ JSON:
-{
-  "weakSkills": ["Tên skill 1", "Tên skill 2"],
-  "shouldReview": ["Tên skill / chủ đề nên ôn lại"],
-  "recommendations": ["câu khuyên 1", "câu khuyên 2", ...]
-}
-`;
-
-    const userPrompt = `
-KHOÁ HỌC: ${course.title}
-BÀI KIỂM TRA: ${exam.title}
-TỔNG ĐIỂM: ${attempt.totalScore}/${attempt.maxScore} (ratio: ${ratio.toFixed(
-      2
-    )})
-
-DANH SÁCH KỸ NĂNG:
-${JSON.stringify(skillContext, null, 2)}
-
-CÂU HỎI & KẾT QUẢ:
-${JSON.stringify(questionSummaries, null, 2)}
-`;
-
-    const raw = await callOpenAI(
-      [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      0.3
-    );
-
-    const ai = safeParseJSON(raw, {
-      weakSkills: [],
-      shouldReview: [],
-      recommendations: [],
-    });
-
-    // ========== CẬP NHẬT UserSkillProfile (nếu muốn, ví dụ tăng/giảm level) ==========
-    const nameToSkill = {};
-    skills.forEach((s) => {
-      nameToSkill[s.name] = s;
-    });
-
-    const ops = [];
-    const weakSkills = ai.weakSkills || [];
-
-    weakSkills.forEach((skillName) => {
-      const skillDoc = nameToSkill[skillName];
-      if (!skillDoc) return;
-
-      // ví dụ: nếu yếu → set level = beginner
-      ops.push(
-        UserSkillProfile.findOneAndUpdate(
-          {
-            user: userId,
-            course: courseId,
-            skill: skillDoc._id,
-          },
-          {
-            level: "beginner",
-            source: "exam",
-            lastExam: examId,
-            lastAttempt: attemptId,
-            lastScoreRatio: ratio,
-            aiSummary: `AI đánh giá ${skillName} còn yếu sau bài kiểm tra.`,
-          },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        )
-      );
-    });
-
-    await Promise.all(ops);
-
-    return res.json({
-      ok: true,
-      input: { courseId, userId, examId, attemptId },
-      ai,
-    });
-  } catch (err) {
-    console.error("analyzeLearningPathAfterExam error:", err);
-    res.status(500).json({
-      ok: false,
-      message: "Lỗi khi phân tích lộ trình sau bài kiểm tra",
-    });
-  }
-};
-
-/* ==========================================================
-   3) LẤY PROFILE KỸ NĂNG CỦA HỌC VIÊN TRONG 1 KHOÁ
-   GET /api/ai/user-skill-profile?course=...&user=...
-========================================================== */
-exports.getUserSkillProfile = async (req, res) => {
-  try {
-    const { course, user } = req.query;
-    if (!course || !user) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Thiếu course hoặc user" });
-    }
-
-    const profiles = await UserSkillProfile.find({
-      course,
-      user,
-    }).populate("skill", "name description level");
-
-    res.json({ ok: true, profiles });
-  } catch (err) {
-    console.error("getUserSkillProfile error:", err);
-    res.status(500).json({
-      ok: false,
-      message: "Lỗi khi lấy profile kỹ năng",
-    });
-  }
-};
+const Skill = require("../models/Skill");const Course = require("../models/Course");const Exam = require("../models/Exam");const ExamAttempt = require("../models/ExamAttempt");const UserSkillProfile = require("../models/UserSkillProfile");const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";const OPENAI_URL = "https://api.openai.com/v1/chat/completions";const OPENAI_KEY = process.env.OPENAI_API_KEY;async function callOpenAI(messages, temperature = 0.3) {  const resp = await fetch(OPENAI_URL, {    method: "POST",    headers: {      "Content-Type": "application/json",      Authorization: `Bearer ${OPENAI_KEY}`,    },    body: JSON.stringify({      model: MODEL,      temperature,      messages,    }),  });  const data = await resp.json();  const text = data?.choices?.[0]?.message?.content?.trim() || "";  return text;}function safeParseJSON(text, fallback) {  try {    const start = text.indexOf("{");    const end = text.lastIndexOf("}");    if (start === -1 || end === -1) return fallback;    const jsonStr = text.substring(start, end + 1);    return JSON.parse(jsonStr);  } catch (e) {    console.error("safeParseJSON error:", e, "RAW:", text);    return fallback;  }}exports.generateSkillMapFromEntryTest = async (req, res) => {  try {    const { courseId, userId, examId, attemptId } = req.body || {};    if (!courseId || !userId || !examId || !attemptId) {      return res.status(400).json({        ok: false,        message: "Thiếu courseId / userId / examId / attemptId",      });    }    const [course, exam, attempt, skills] = await Promise.all([      Course.findById(courseId),      Exam.findById(examId),      ExamAttempt.findById(attemptId).populate({        path: "answers.question",        model: "ExamQuestionBank",      }),      Skill.find({ course: courseId }).sort({ order: 1 }),    ]);    if (!course || !exam || !attempt) {      return res.status(404).json({        ok: false,        message: "Không tìm thấy course/exam/attempt phù hợp",      });    }    const ratio =      attempt.maxScore > 0        ? attempt.totalScore / attempt.maxScore        : 0;    const questionSummaries = attempt.answers.map((ans, idx) => {      const q = ans.question || {};      const correctRatio =        ans.maxScore > 0 ? (ans.score || 0) / ans.maxScore : 0;      return {        index: idx + 1,        content: q.content,        type: q.type,        difficulty: q.difficulty,        score: ans.score || 0,        maxScore: ans.maxScore || 0,        correctRatio,      };    });    const skillContext = skills.map((s) => ({      id: String(s._id),      name: s.name,      description: s.description || "",      level: s.level || "intermediate",    }));    const systemPrompt = `Bạn là hệ thống tư vấn lộ trình học dựa trên bài test đầu vào cho một khoá học lập trình / kỹ năng.Nhiệm vụ:- Nhìn vào kết quả bài test đầu vào (câu hỏi + điểm) và danh sách kỹ năng của khoá học.- Suy luận mức độ hiện tại của học viên với từng kỹ năng: "beginner", "intermediate", "advanced".- Đề xuất lộ trình học (recommendedPath): danh sách tên kỹ năng theo thứ tự nên học.- Liệt kê các kỹ năng quan trọng nhất nên tập trung trong giai đoạn đầu (suggestedSkills).TRẢ VỀ DUY NHẤT JSON theo format:{  "skillLevels": {    "Tên skill 1": "beginner" | "intermediate" | "advanced",    "Tên skill 2": "..."  },  "recommendedPath": [    "Tên skill ưu tiên 1",    "Tên skill ưu tiên 2",    "..."  ],  "suggestedSkills": [    "Tên skill quan trọng 1",    "Tên skill quan trọng 2"  ]}`;    const userPrompt = `THÔNG TIN KHOÁ HỌC: ${course.title}KỸ NĂNG TRONG KHOÁ:${JSON.stringify(skillContext, null, 2)}KẾT QUẢ ENTRY TEST:Điểm tổng: ${attempt.totalScore}/${attempt.maxScore} (ratio: ${ratio.toFixed(      2    )})Danh sách câu hỏi & kết quả:${JSON.stringify(questionSummaries, null, 2)}`;    const raw = await callOpenAI(      [        { role: "system", content: systemPrompt },        { role: "user", content: userPrompt },      ],      0.3    );    const ai = safeParseJSON(raw, {      skillLevels: {},      recommendedPath: [],      suggestedSkills: [],    });    const nameToSkill = {};    skills.forEach((s) => {      nameToSkill[s.name] = s;    });    const ops = [];    const skillLevels = ai.skillLevels || {};    for (const [skillName, level] of Object.entries(skillLevels)) {      const skillDoc = nameToSkill[skillName];      if (!skillDoc) continue;      const lvl =        ["beginner", "intermediate", "advanced"].includes(level)          ? level          : "beginner";      ops.push(        UserSkillProfile.findOneAndUpdate(          {            user: userId,            course: courseId,            skill: skillDoc._id,          },          {            level: lvl,            source: "entry_test",            lastExam: examId,            lastAttempt: attemptId,            lastScoreRatio: ratio,            aiSummary: `AI đánh giá ${skillName} ở mức ${lvl} dựa trên bài test đầu vào.`,          },          { upsert: true, new: true, setDefaultsOnInsert: true }        )      );    }    await Promise.all(ops);    return res.json({      ok: true,      input: { courseId, userId, examId, attemptId },      ai,    });  } catch (err) {    console.error("generateSkillMapFromEntryTest error:", err);    res.status(500).json({      ok: false,      message: "Lỗi khi sinh Skill Map từ entry test",    });  }};exports.analyzeLearningPathAfterExam = async (req, res) => {  try {    const { courseId, userId, examId, attemptId } = req.body || {};    if (!courseId || !userId || !examId || !attemptId) {      return res.status(400).json({        ok: false,        message: "Thiếu courseId / userId / examId / attemptId",      });    }    const [course, exam, attempt, skills] = await Promise.all([      Course.findById(courseId),      Exam.findById(examId),      ExamAttempt.findById(attemptId).populate({        path: "answers.question",        model: "ExamQuestionBank",      }),      Skill.find({ course: courseId }).sort({ order: 1 }),    ]);    if (!course || !exam || !attempt) {      return res.status(404).json({        ok: false,        message: "Không tìm thấy course/exam/attempt phù hợp",      });    }    const ratio =      attempt.maxScore > 0        ? attempt.totalScore / attempt.maxScore        : 0;    const questionSummaries = attempt.answers.map((ans, idx) => {      const q = ans.question || {};      const correctRatio =        ans.maxScore > 0 ? (ans.score || 0) / ans.maxScore : 0;      return {        index: idx + 1,        content: q.content,        type: q.type,        difficulty: q.difficulty,        score: ans.score || 0,        maxScore: ans.maxScore || 0,        correctRatio,      };    });    const skillContext = skills.map((s) => ({      id: String(s._id),      name: s.name,      description: s.description || "",      level: s.level || "intermediate",    }));    const systemPrompt = `Bạn là cố vấn học tập.Nhiệm vụ:- Dựa trên kết quả bài kiểm tra giữa kỳ/cuối kỳ và danh sách kỹ năng.- Xác định các "weakSkills": kỹ năng còn yếu / điểm thấp.- Gợi ý "shouldReview": danh sách bài / chủ đề nên ôn lại (theo tên kỹ năng).- Đưa ra "recommendations": những lời khuyên cụ thể (câu văn ngắn tiếng Việt).TRẢ VỀ JSON:{  "weakSkills": ["Tên skill 1", "Tên skill 2"],  "shouldReview": ["Tên skill / chủ đề nên ôn lại"],  "recommendations": ["câu khuyên 1", "câu khuyên 2", ...]}`;    const userPrompt = `KHOÁ HỌC: ${course.title}BÀI KIỂM TRA: ${exam.title}TỔNG ĐIỂM: ${attempt.totalScore}/${attempt.maxScore} (ratio: ${ratio.toFixed(      2    )})DANH SÁCH KỸ NĂNG:${JSON.stringify(skillContext, null, 2)}CÂU HỎI & KẾT QUẢ:${JSON.stringify(questionSummaries, null, 2)}`;    const raw = await callOpenAI(      [        { role: "system", content: systemPrompt },        { role: "user", content: userPrompt },      ],      0.3    );    const ai = safeParseJSON(raw, {      weakSkills: [],      shouldReview: [],      recommendations: [],    });    const nameToSkill = {};    skills.forEach((s) => {      nameToSkill[s.name] = s;    });    const ops = [];    const weakSkills = ai.weakSkills || [];    weakSkills.forEach((skillName) => {      const skillDoc = nameToSkill[skillName];      if (!skillDoc) return;      ops.push(        UserSkillProfile.findOneAndUpdate(          {            user: userId,            course: courseId,            skill: skillDoc._id,          },          {            level: "beginner",            source: "exam",            lastExam: examId,            lastAttempt: attemptId,            lastScoreRatio: ratio,            aiSummary: `AI đánh giá ${skillName} còn yếu sau bài kiểm tra.`,          },          { upsert: true, new: true, setDefaultsOnInsert: true }        )      );    });    await Promise.all(ops);    return res.json({      ok: true,      input: { courseId, userId, examId, attemptId },      ai,    });  } catch (err) {    console.error("analyzeLearningPathAfterExam error:", err);    res.status(500).json({      ok: false,      message: "Lỗi khi phân tích lộ trình sau bài kiểm tra",    });  }};exports.getUserSkillProfile = async (req, res) => {  try {    const { course, user } = req.query;    if (!course || !user) {      return res        .status(400)        .json({ ok: false, message: "Thiếu course hoặc user" });    }    const profiles = await UserSkillProfile.find({      course,      user,    }).populate("skill", "name description level");    res.json({ ok: true, profiles });  } catch (err) {    console.error("getUserSkillProfile error:", err);    res.status(500).json({      ok: false,      message: "Lỗi khi lấy profile kỹ năng",    });  }};

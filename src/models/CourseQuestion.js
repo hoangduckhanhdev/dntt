@@ -1,36 +1,1 @@
-// models/CourseQuestion.js
-const mongoose = require("mongoose");
-
-const courseQuestionSchema = new mongoose.Schema(
-  {
-    course: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
-      required: true,
-    },
-
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
-    question: { type: String, required: true },
-
-    // Trả lời
-    answer: { type: String },
-    answeredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    answeredAt: { type: Date },
-
-    status: {
-      type: String,
-      enum: ["pending", "answered"],
-      default: "pending",
-    },
-  },
-  { timestamps: true }
-);
-
-module.exports =
-  mongoose.models.CourseQuestion ||
-  mongoose.model("CourseQuestion", courseQuestionSchema);
+const mongoose = require("mongoose");const courseQuestionSchema = new mongoose.Schema(  {    course: {      type: mongoose.Schema.Types.ObjectId,      ref: "Course",      required: true,    },    user: {      type: mongoose.Schema.Types.ObjectId,      ref: "User",      required: true,    },    question: { type: String, required: true },    answer: { type: String },    answeredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },    answeredAt: { type: Date },    status: {      type: String,      enum: ["pending", "answered"],      default: "pending",    },  },  { timestamps: true });module.exports =  mongoose.models.CourseQuestion ||  mongoose.model("CourseQuestion", courseQuestionSchema);

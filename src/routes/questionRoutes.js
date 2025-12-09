@@ -1,25 +1,1 @@
-// routes/questionRoutes.js
-const express = require("express");
-const { protect } = require("../middlewares/authMiddleware");
-const Question = require("../models/Question");
-const router = express.Router();
-
-// Học viên lấy + gửi câu hỏi theo course
-router.get("/course/:courseId", protect, async (req, res) => {
-  const questions = await Question
-    .find({ course: req.params.courseId })
-    .populate("user", "name")
-    .sort({ createdAt: -1 });
-  res.json(questions);
-});
-
-router.post("/course/:courseId", protect, async (req, res) => {
-  const q = await Question.create({
-    course: req.params.courseId,
-    user: req.user._id,
-    content: req.body.content,
-  });
-  res.status(201).json(q);
-});
-
-module.exports = router;
+const express = require("express");const { protect } = require("../middlewares/authMiddleware");const Question = require("../models/Question");const router = express.Router();router.get("/course/:courseId", protect, async (req, res) => {  const questions = await Question    .find({ course: req.params.courseId })    .populate("user", "name")    .sort({ createdAt: -1 });  res.json(questions);});router.post("/course/:courseId", protect, async (req, res) => {  const q = await Question.create({    course: req.params.courseId,    user: req.user._id,    content: req.body.content,  });  res.status(201).json(q);});module.exports = router;

@@ -1,9 +1,9 @@
 // clean-comments.js
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
 // Những folder sẽ bỏ qua
-const SKIP_DIRS = ["node_modules", ".git", "dist", "build"];
+const SKIP_DIRS = ['node_modules', '.git', 'dist', 'build'];
 
 // Định dạng file cần xử lý
 const FILE_EXT_REGEX = /\.(js|jsx|ts|tsx)$/;
@@ -39,27 +39,31 @@ function walkDir(dir, fileList = []) {
 }
 
 function cleanFile(filePath) {
-  const original = fs.readFileSync(filePath, "utf8");
+  // Không tự sửa chính script này
+  if (path.basename(filePath) === 'clean-comments.js') return;
 
-  // Xoá comment block /* ... */
-  let cleaned = original.replace(/\/\*[\s\S]*?\*\//g, "");
+  const original = fs.readFileSync(filePath, 'utf8');
 
-  // Xoá comment dòng // ...
-  cleaned = cleaned.replace(/\s*\/\/.*$/gm, "");
+  let cleaned = original;
 
-  // Xoá dòng trống thừa
-  cleaned = cleaned.replace(/^\s*\n/gm, "");
+  // 1) Xoá comment block /* ... */
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // 2) Xoá comment dòng //..., nhưng bỏ qua http://, https:// (có '://')
+  //    Giữ lại ký tự phía trước (group 1), bỏ phần sau //
+  cleaned = cleaned.replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  // 3) Xoá dòng trống thừa
+  cleaned = cleaned.replace(/^\s*\n/gm, '');
 
   if (cleaned !== original) {
-    fs.writeFileSync(filePath, cleaned, "utf8");
-    console.log("✅ Cleaned:", filePath);
+    fs.writeFileSync(filePath, cleaned, 'utf8');
+    console.log('✅ Cleaned:', filePath);
   }
 }
 
-console.log("🔍 Scanning folder:", ROOT_DIR);
+console.log('🔍 Scanning folder:', ROOT_DIR);
 const files = walkDir(ROOT_DIR);
-console.log("📄 Found", files.length, "files (.js/.jsx/.ts/.tsx)");
-
+console.log('📄 Found', files.length, 'files (.js/.jsx/.ts/.tsx)');
 files.forEach(cleanFile);
-
-console.log("🎉 Done!");
+console.log('🎉 Done!');

@@ -1,42 +1,1 @@
-const express = require("express");
-const router = express.Router();
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const {
-  getProfile,
-  updateProfile,
-} = require("../../controllers/admin/adminProfileController");
-const { protect, adminOrTeacher } = require("../../middlewares/authMiddleware");
-
-const uploadDir = path.join(__dirname, "../../uploads/avatars");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
-});
-
-const upload = multer({ storage });
-
-router.get("/", protect, adminOrTeacher, getProfile);
-router.put("/", protect, adminOrTeacher, updateProfile);
-
-router.post(
-  "/upload-avatar",
-  protect,
-  adminOrTeacher,
-  upload.single("avatar"),
-  (req, res) => {
-    if (!req.file) {
-      return res
-        .status(400)
-        .json({ message: "Không có file nào được tải lên." });
-    }
-
-    const fileUrl = `/uploads/avatars/${req.file.filename}`;
-    res.json({ url: fileUrl, message: "Tải ảnh lên thành công." });
-  }
-);
-
-module.exports = router;
+const express = require("express");const router = express.Router();const multer = require("multer");const path = require("path");const fs = require("fs");const {  getProfile,  updateProfile,} = require("../../controllers/admin/adminProfileController");const { protect, adminOrTeacher } = require("../../middlewares/authMiddleware");const uploadDir = path.join(__dirname, "../../uploads/avatars");if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });const storage = multer.diskStorage({  destination: (req, file, cb) => cb(null, uploadDir),  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),});const upload = multer({ storage });router.get("/", protect, adminOrTeacher, getProfile);router.put("/", protect, adminOrTeacher, updateProfile);router.post(  "/upload-avatar",  protect,  adminOrTeacher,  upload.single("avatar"),  (req, res) => {    if (!req.file) {      return res        .status(400)        .json({ message: "Không có file nào được tải lên." });    }    const fileUrl = `/uploads/avatars/${req.file.filename}`;    res.json({ url: fileUrl, message: "Tải ảnh lên thành công." });  });module.exports = router;

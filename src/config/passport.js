@@ -1,68 +1,1 @@
-
-require("dotenv").config();
-const passport = require("passport");
-const { Strategy: JwtStrategy, ExtractJwt } = require("passport-jwt");
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
-const User = require("../models/User");
-
-const backendURL = process.env.BACKEND_URL || "http://localhost:5000";
-const jwtOptions = {
-  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: process.env.JWT_SECRET || "secret", 
-};
-passport.use(
-  "jwt",
-  new JwtStrategy(jwtOptions, async (payload, done) => {
-    try {
-      const userId = payload.id;
-
-      const user = await User.findById(userId).select("-password");
-      if (!user) {
-        return done(null, false);
-      }
-      return done(null, user);
-    } catch (err) {
-      return done(err, false);
-    }
-  })
-);
-
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: `${backendURL}/api/auth/google/callback`,
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        let user = await User.findOne({ googleId: profile.id });
-        if (!user && profile.emails && profile.emails.length > 0) {
-          user = await User.findOne({ email: profile.emails[0].value });
-        }
-        if (user) {
-          if (!user.googleId) {
-            user.googleId = profile.id;
-            await user.save();
-          }
-          return done(null, user);
-        }
-        const newUser = await User.create({
-          googleId: profile.id,
-          name: profile.displayName,
-          email: profile.emails?.[0]?.value,
-          avatar: profile.photos?.[0]?.value,
-          password: "google_oauth_no_password",
-          role: "student", 
-        });
-
-        return done(null, newUser);
-      } catch (err) {
-        console.error("Google auth error:", err);
-        return done(err, null);
-      }
-    }
-  )
-);
-
-module.exports = passport;
+require("dotenv").config();const passport = require("passport");const { Strategy: JwtStrategy, ExtractJwt } = require("passport-jwt");const GoogleStrategy = require("passport-google-oauth20").Strategy;const User = require("../models/User");const backendURL = process.env.BACKEND_URL || "http://localhost:5000";const jwtOptions = {  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),  secretOrKey: process.env.JWT_SECRET || "secret", };passport.use(  "jwt",  new JwtStrategy(jwtOptions, async (payload, done) => {    try {      const userId = payload.id;      const user = await User.findById(userId).select("-password");      if (!user) {        return done(null, false);      }      return done(null, user);    } catch (err) {      return done(err, false);    }  }));passport.use(  new GoogleStrategy(    {      clientID: process.env.GOOGLE_CLIENT_ID,      clientSecret: process.env.GOOGLE_CLIENT_SECRET,      callbackURL: `${backendURL}/api/auth/google/callback`,    },    async (accessToken, refreshToken, profile, done) => {      try {        let user = await User.findOne({ googleId: profile.id });        if (!user && profile.emails && profile.emails.length > 0) {          user = await User.findOne({ email: profile.emails[0].value });        }        if (user) {          if (!user.googleId) {            user.googleId = profile.id;            await user.save();          }          return done(null, user);        }        const newUser = await User.create({          googleId: profile.id,          name: profile.displayName,          email: profile.emails?.[0]?.value,          avatar: profile.photos?.[0]?.value,          password: "google_oauth_no_password",          role: "student",         });        return done(null, newUser);      } catch (err) {        console.error("Google auth error:", err);        return done(err, null);      }    }  ));module.exports = passport;

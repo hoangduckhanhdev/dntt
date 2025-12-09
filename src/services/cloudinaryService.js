@@ -1,7 +1,1 @@
-const cloudinary = require('../config/cloudinary');
-
-exports.uploadFromPath = async (path, folder='courses') => {
-  if(!process.env.CLOUDINARY_CLOUD_NAME) return null;
-  const res = await cloudinary.uploader.upload(path, { folder });
-  return res.secure_url;
-};
+const cloudinary = require('../config/cloudinary');exports.uploadFromPath = async (path, folder='courses') => {  if(!process.env.CLOUDINARY_CLOUD_NAME) return null;  const res = await cloudinary.uploader.upload(path, { folder });  return res.secure_url;};
