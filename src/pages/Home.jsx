@@ -159,7 +159,7 @@ export default function Home() {
         <section className="mt-16">
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-extrabold text-dark inline-flex items-center gap-3">
-              <span className="text-3xl">🔥</span>
+              <span className="text-3xl"></span>
               Khóa học nổi bật
             </h2>
             <div className="mt-3">

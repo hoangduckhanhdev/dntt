@@ -163,8 +163,6 @@ export default function AdminUsers() {
       Swal.fire("Lỗi!", "Không thể xoá người dùng.", "error");
     }
   };
-
-  // ------------------ FILTER + SEARCH ------------------
   const filteredUsers = users.filter((u) => {
     const matchSearch =
       u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -235,7 +233,7 @@ export default function AdminUsers() {
               >
                 <div className="flex flex-col items-center text-center">
                   <img
-                    src={user.avatar || "https://via.placeholder.com/80"}
+                    src={user.avatar || "https://placehold.co/80x80"}
                     alt={user.name}
                     className="w-20 h-20 rounded-full object-cover mb-3 border-2 border-orange-200"
                   />
