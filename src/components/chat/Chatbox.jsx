@@ -282,7 +282,7 @@ export default function Chatbox() {
       )}
 
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[92vw] rounded-2xl border border-border bg-white shadow-2xl overflow-hidden">
+        <div className="fixed bottom-6 right-6 z-50 w-[450px] max-w-[150vw] rounded-2xl border border-border bg-white shadow-2xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary to-accent text-white">
             <div className="font-semibold">HKCode Chatbox</div>
             <button
