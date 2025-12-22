@@ -1,1 +1,53 @@
-const mongoose = require("mongoose");const { Schema } = mongoose;const studyRoomSchema = new Schema(  {    name: {      type: String,      required: true,      trim: true,    },    course: {      type: Schema.Types.ObjectId,      ref: "Course",      default: null,    },    lessonId: {      type: Schema.Types.ObjectId,      ref: "Lesson",      default: null,    },    createdBy: {      type: Schema.Types.ObjectId,      ref: "User",      required: true,    },    members: [      {        user: { type: Schema.Types.ObjectId, ref: "User", required: true },        role: {          type: String,          enum: ["student", "teacher", "admin"],          default: "student",        },        joinedAt: {          type: Date,          default: Date.now,        },      },    ],    isPublic: {      type: Boolean,      default: false,    },    isArchived: {      type: Boolean,      default: false,    },  },  {    timestamps: true,   });module.exports = mongoose.model("StudyRoom", studyRoomSchema);
+const mongoose = require("mongoose");
+const { Schema } = mongoose;
+const studyRoomSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    course: {
+      type: Schema.Types.ObjectId,
+      ref: "Course",
+      default: null,
+    },
+    lessonName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    members: [
+      {
+        user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        role: {
+          type: String,
+          enum: ["student", "teacher", "admin"],
+          default: "student",
+        },
+        joinedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    isPublic: {
+      type: Boolean,
+      default: false,
+    },
+    isArchived: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: true, 
+  }
+);
+module.exports = mongoose.model("StudyRoom", studyRoomSchema);

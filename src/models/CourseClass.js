@@ -1,1 +1,26 @@
-const mongoose = require("mongoose");const courseClassSchema = new mongoose.Schema(  {    name: { type: String, required: true, trim: true },    code: { type: String, trim: true },    course: {      type: mongoose.Schema.Types.ObjectId,      ref: "Course",      required: true,    },    teacher: {      type: mongoose.Schema.Types.ObjectId,      ref: "User",       required: true,    },    students: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],    semester: { type: String, trim: true },    year: { type: String, trim: true },    exams: [{ type: mongoose.Schema.Types.ObjectId, ref: "Exam" }],    homeworks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Exam" }],   },  { timestamps: true });module.exports =  mongoose.models.CourseClass ||  mongoose.model("CourseClass", courseClassSchema);
+const mongoose = require("mongoose");
+const courseClassSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    code: { type: String, trim: true },
+    course: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Course",
+      required: true,
+    },
+    teacher: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User", 
+      required: true,
+    },
+    students: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    semester: { type: String, trim: true },
+    year: { type: String, trim: true },
+    exams: [{ type: mongoose.Schema.Types.ObjectId, ref: "Exam" }],
+    homeworks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Exam" }], 
+  },
+  { timestamps: true }
+);
+module.exports =
+  mongoose.models.CourseClass ||
+  mongoose.model("CourseClass", courseClassSchema);
