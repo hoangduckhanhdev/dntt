@@ -43,17 +43,16 @@ export default function AdminUsers() {
     }
   };
 
-  const handleRoleChange = async (id, role) => {
-    try {
-      await updateUserRole(id, { role });
-      Swal.fire("Thành công!", "Vai trò đã được cập nhật.", "success");
-      fetchUsers();
-    } catch (err) {
-      Swal.fire("Lỗi!", "Không thể cập nhật vai trò.", "error");
-    }
-  };
-
-  // ------------------ THÊM USER ------------------
+const handleRoleChange = async (id, role) => {
+  try {
+    await updateUserRole(id, role);
+    Swal.fire("Thành công!", "Vai trò đã được cập nhật.", "success");
+    fetchUsers();
+  } catch (err) {
+    console.error(err?.response?.data || err);
+    Swal.fire("Lỗi!", err?.response?.data?.message || "Không thể cập nhật vai trò.", "error");
+  }
+};
   const handleAddUser = async () => {
     const { value: formValues } = await Swal.fire({
       title: "➕ Thêm người dùng mới",
@@ -96,7 +95,6 @@ export default function AdminUsers() {
     }
   };
 
-  // ------------------ SỬA USER ------------------
   const handleEditUser = async (user) => {
     const { value: values } = await Swal.fire({
       title: "✏️ Chỉnh sửa người dùng",
@@ -121,7 +119,6 @@ export default function AdminUsers() {
     }
   };
 
-  // ------------------ ĐỔI PASSWORD ------------------
   const handleChangePassword = async (user) => {
     const { value } = await Swal.fire({
       title: "🔐 Đổi mật khẩu",
@@ -142,7 +139,6 @@ export default function AdminUsers() {
     }
   };
 
-  // ------------------ XOÁ USER ------------------
   const handleDelete = async (id) => {
     const confirm = await Swal.fire({
       title: "Bạn chắc chắn?",
@@ -195,7 +191,6 @@ export default function AdminUsers() {
         </button>
       </div>
 
-      {/* Search + Filter */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
         <div className="flex items-center border rounded-lg px-3 py-2 w-full md:w-72 bg-white shadow-sm">
           <Search size={18} className="text-gray-400 mr-2" />
