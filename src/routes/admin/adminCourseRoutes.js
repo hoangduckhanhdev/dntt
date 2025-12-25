@@ -12,6 +12,7 @@ const {
   getCourseQuestions,
   answerCourseQuestion,
   getCourseClasses, 
+  updateCourseCurriculum,
 } = require("../../controllers/admin/adminCourseController");
 const { protect, adminOrTeacher } = require("../../middlewares/authMiddleware");
 const upload = require("../../middlewares/upload");
@@ -25,10 +26,11 @@ router.delete("/:id", protect, adminOrTeacher, deleteCourse);
 router.get("/:id/students", protect, adminOrTeacher, getCourseStudents);
 router.get("/:id/students/:userId/progress", protect, adminOrTeacher, getStudentProgress);
 router.get("/:id/questions", protect, adminOrTeacher, getCourseQuestions);
-router.post(
-  "/:id/questions/:questionId/answer",
+router.post("/:id/questions/:questionId/answer",protect,adminOrTeacher,answerCourseQuestion);
+router.put(
+  "/:id/curriculum",
   protect,
   adminOrTeacher,
-  answerCourseQuestion
+  updateCourseCurriculum
 );
 module.exports = router;

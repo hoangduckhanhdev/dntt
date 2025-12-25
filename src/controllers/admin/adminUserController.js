@@ -1,9 +1,12 @@
+
+const mongoose = require("mongoose");
 const fs = require("fs");
 const User = require("../../models/User");
 const Teacher = require("../../models/Teacher");
 const cloudinary = require("../../config/cloudinary");
 const slugify = require("slugify");
 const bcrypt = require("bcryptjs");
+
 async function uploadAvatar(file) {
   if (!file) return "";
   const result = await cloudinary.uploader.upload(file.path, {
@@ -108,23 +111,62 @@ const createUser = async (req, res) => {
 };
 const updateUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "User id không hợp lệ" });
+    }
+
+    const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    const { name, email, role } = req.body;
+
+    let { name, email, role } = req.body;
+
+    if (typeof role !== "undefined") {
+  if (typeof role === "object" && role !== null) {
+    role = role.value ?? role.role ?? role.name ?? "";
+  }
+  role = String(role || "").trim().toLowerCase();
+  if (role) user.role = role;
+}
+
+
+    if (typeof email !== "undefined") {
+      email = String(email).trim().toLowerCase();
+      if (email) {
+        const exists = await User.findOne({ email, _id: { $ne: id } }).select("_id");
+        if (exists) return res.status(400).json({ message: "Email đã tồn tại" });
+        user.email = email;
+      }
+    }
+
+    if (typeof role !== "undefined") {
+      role = String(role).trim().toLowerCase();
+      if (role) user.role = role;
+    }
+
     let avatarUrl = "";
-    if (name) user.name = name;
-    if (email) user.email = email;
-    if (role) user.role = role;
     if (req.file) {
       avatarUrl = await uploadAvatar(req.file);
       user.avatar = avatarUrl;
     }
+
     await user.save();
     await ensureTeacherProfile(user, avatarUrl);
-    res.json({ message: "User updated", user });
+
+    return res.json({ message: "User updated", user });
   } catch (err) {
     console.error("❌ updateUser error:", err);
-    res.status(500).json({ message: "Server error" });
+
+    if (err?.code === 11000) {
+      return res.status(400).json({ message: "Email đã tồn tại" });
+    }
+
+    if (err?.name === "ValidationError") {
+      return res.status(400).json({ message: err.message });
+    }
+
+    return res.status(500).json({ message: "Server error" });
   }
 };
 const deleteUser = async (req, res) => {

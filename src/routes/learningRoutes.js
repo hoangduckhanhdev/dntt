@@ -1,1 +1,53 @@
-const express = require("express");const router = express.Router();const { protect, adminOrTeacher } = require("../middlewares/authMiddleware");const learningController = require("../controllers/learningController");const aiAnalyzer = require("../controllers/aiLearningAnalyzerController");router.get("/my-courses", protect, learningController.getMyCourses);router.get(  "/courses/:id/questions",  protect,  learningController.getCourseQuestionsForLearning);router.post(  "/courses/:id/questions",  protect,  learningController.createCourseQuestionForLearning);router.patch(  "/courses/:id/questions/:questionId/answer",  protect,  adminOrTeacher,  learningController.answerCourseQuestion);router.get(  "/analyze/:attemptId",  protect,  aiAnalyzer.analyzeLearningAfterExam);router.get(  "/mindmap-image/:attemptId",  protect,  aiAnalyzer.generateMindmapImage);module.exports = router;
+const express = require("express");
+const router = express.Router();
+const { protect, adminOrTeacher } = require("../middlewares/authMiddleware");
+const learningController = require("../controllers/learningController");
+const aiAnalyzer = require("../controllers/aiLearningAnalyzerController");
+
+router.get("/my-courses", protect, learningController.getMyCourses);
+
+router.get(
+  "/courses/:id/questions",
+  protect,
+  learningController.getCourseQuestionsForLearning
+);
+
+router.post(
+  "/courses/:id/questions",
+  protect,
+  learningController.createCourseQuestionForLearning
+);
+
+router.patch(
+  "/courses/:id/questions/:questionId/answer",
+  protect,
+  adminOrTeacher,
+  learningController.answerCourseQuestion
+);
+
+router.get(
+  "/courses/:courseId/lessons",
+  protect,
+  learningController.getCourseLessonsForLearning
+);
+
+router.get(
+  "/courses/:courseId/lessons/:lessonId",
+  protect,
+  learningController.getLessonForLearning
+);
+router.post(
+  "/courses/:courseId/lessons/:lessonId/complete",
+  protect,
+  learningController.completeLesson
+);
+
+router.get("/analyze/:attemptId", protect, aiAnalyzer.analyzeLearningAfterExam);
+
+router.get(
+  "/mindmap-image/:attemptId",
+  protect,
+  aiAnalyzer.generateMindmapImage
+);
+
+module.exports = router;

@@ -1,1 +1,56 @@
-const mongoose = require("mongoose");const optionSchema = new mongoose.Schema(  {    text: { type: String, trim: true, required: true },    isCorrect: { type: Boolean, default: false }  },  { _id: true });const examQuestionBankSchema = new mongoose.Schema(  {    course: {      type: mongoose.Schema.Types.ObjectId,      ref: "Course",      required: true,      index: true    },    createdBy: {      type: mongoose.Schema.Types.ObjectId,      ref: "User",      required: true    },    content: { type: String, required: true, trim: true },    type: {      type: String,      enum: [        "multiple_choice",        "true_false",        "short_answer",        "essay",        "file_upload"      ],      required: true    },    options: [optionSchema],    correctAnswer: { type: String, trim: true },    expectedAnswer: { type: String, trim: true },    score: { type: Number, default: 1, min: 0 },    chapter: { type: String, trim: true },    difficulty: {      type: String,      enum: ["easy", "medium", "hard"],      default: "medium"    },    tags: [{ type: String, trim: true }],    skill: {      type: mongoose.Schema.Types.ObjectId,      ref: "Skill",      index: true,    },    aiAutoGrade: { type: Boolean, default: false }  },  { timestamps: true });module.exports =  mongoose.models.ExamQuestionBank ||  mongoose.model("ExamQuestionBank", examQuestionBankSchema);
+const mongoose = require("mongoose");
+const optionSchema = new mongoose.Schema(
+  {
+    text: { type: String, trim: true, required: true },
+    isCorrect: { type: Boolean, default: false }
+  },
+  { _id: true }
+);
+const examQuestionBankSchema = new mongoose.Schema(
+  {
+    course: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Course",
+      required: true,
+      index: true
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
+    content: { type: String, required: true, trim: true },
+    type: {
+      type: String,
+      enum: [
+        "multiple_choice",
+        "true_false",
+        "short_answer",
+        "essay",
+        "file_upload"
+      ],
+      required: true
+    },
+    options: [optionSchema],
+    correctAnswer: { type: String, trim: true },
+    expectedAnswer: { type: String, trim: true },
+    score: { type: Number, default: 1, min: 0 },
+    chapter: { type: String, trim: true },
+    difficulty: {
+      type: String,
+      enum: ["easy", "medium", "hard"],
+      default: "medium"
+    },
+    tags: [{ type: String, trim: true }],
+    skill: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Skill",
+      index: true,
+    },
+    aiAutoGrade: { type: Boolean, default: false }
+  },
+  { timestamps: true }
+);
+module.exports =
+  mongoose.models.ExamQuestionBank ||
+  mongoose.model("ExamQuestionBank", examQuestionBankSchema);

@@ -160,8 +160,12 @@ exports.getCourse = async (req, res) => {
     const course = await Course.findById(req.params.id)
       .populate("category", "name description image")
       .populate("teacher", "name title expertise bio image user");
-    if (!course)
+
+    if (!course) {
       return res.status(404).json({ message: "Không tìm thấy khóa học" });
+    }
+
+    // ✅ teacher chỉ được xem khóa học của mình
     if (req.userDoc.role === "teacher") {
       const teacher = await findTeacherForUser(req.userDoc);
       if (!teacher || course.teacher?._id.toString() !== teacher._id.toString()) {
@@ -170,12 +174,38 @@ exports.getCourse = async (req, res) => {
         });
       }
     }
-    res.json({
+
+    // ✅ Trả đầy đủ sections để vào lại trang outline còn thấy type/textContent
+    return res.json({
       _id: course._id,
       title: course.title,
       description: course.description,
       price: course.price,
       image: course.image,
+
+      // ✅ thêm để trang outline load lại được
+      videoDemo: course.videoDemo || "",
+
+      // ✅ thêm sections (outline)
+      sections: (course.sections || []).map((sec) => ({
+        _id: sec._id,
+        title: sec.title,
+        order: sec.order || 0,
+        lessons: (sec.lessons || []).map((ls) => ({
+          _id: ls._id,
+          title: ls.title,
+          duration: ls.duration || "",
+          order: ls.order || 0,
+
+          // ✅ 2 field mới
+          type: ls.type || "video",
+          textContent: ls.textContent || "",
+
+          // ✅ field cũ
+          video: ls.video || "",
+        })),
+      })),
+
       category: course.category?.name || "Chưa có danh mục",
       teacher: course.teacher?.name || "Chưa có giảng viên",
       teacherTitle: course.teacher?.title || "",
@@ -186,9 +216,10 @@ exports.getCourse = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Lỗi khi lấy chi tiết khóa học:", err);
-    res.status(500).json({ message: "Lỗi server", error: err.message });
+    return res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
+
 exports.createCourse = async (req, res) => {
   try {
     const { title, description, teacher: teacherInput, price, category } =
@@ -554,3 +585,52 @@ exports.answerCourseQuestion = async (req, res) => {
     return res.status(500).json({ message: "Không thể lưu câu trả lời." });
   }
 };
+exports.updateCourseCurriculum = async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id);
+    if (!course) {
+      return res.status(404).json({ message: "Không tìm thấy khóa học" });
+    }
+
+    if (req.userDoc?.role === "teacher") {
+      const teacher = await findTeacherForUser(req.userDoc);
+      if (!teacher || course.teacher.toString() !== teacher._id.toString()) {
+        return res.status(403).json({
+          message: "Bạn không có quyền sửa outline khoá học này",
+        });
+      }
+    }
+    const { videoDemo, sections } = req.body;
+
+    if (typeof videoDemo !== "undefined") {
+      course.videoDemo = videoDemo || "";
+    }
+    if (Array.isArray(sections)) {
+      course.sections = sections.map((sec, sIdx) => ({
+        title: sec?.title || `Chương ${sIdx + 1}`,
+        order: Number(sec?.order ?? sIdx),
+
+        lessons: Array.isArray(sec?.lessons)
+          ? sec.lessons.map((ls, lIdx) => {
+              const type = ls?.type === "text" ? "text" : "video";
+              return {
+                title: ls?.title || `Bài ${lIdx + 1}`,
+                duration: ls?.duration || "",
+                order: Number(ls?.order ?? lIdx),
+                type,
+                video: type === "video" ? (ls?.video || "") : "",
+                textContent: type === "text" ? (ls?.textContent || "") : "",
+              };
+            })
+          : [],
+      }));
+    }
+
+    await course.save();
+    return res.json({ message: "Đã lưu outline", course });
+  } catch (err) {
+    console.error("❌ updateCourseCurriculum error:", err);
+    return res.status(500).json({ message: "Lỗi server", error: err.message });
+  }
+};
+
